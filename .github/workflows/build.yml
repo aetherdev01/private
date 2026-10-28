@@ -12,22 +12,24 @@ permissions:
   contents: read
 
 jobs:
-  build-ui-so:
-    name: Build UI-only .so (arm64-v8a)
+  build:
+    name: Build UI Library
     runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install Android NDK
         shell: bash
@@ -36,19 +38,16 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Build UI library
+      - name: Build native UI library
         shell: bash
         run: |
           set -euo pipefail
 
-          JNI_DIR="$GITHUB_WORKSPACE/app/src/main/jni"
-          UI_DIR="$JNI_DIR/AetherX_UI"
+          UI_DIR="$GITHUB_WORKSPACE/app/src/main/jni/AetherX_UI"
 
-          test -f "$UI_DIR/aether.cpp"
-          test -f "$UI_DIR/aether.h"
           test -f "$UI_DIR/Android.mk"
           test -f "$UI_DIR/Application.mk"
-          test -f "$JNI_DIR/imgui/imgui.cpp"
+          test -f "$UI_DIR/aether.cpp"
 
           mkdir -p "$RUNNER_TEMP/ndk-obj" "$RUNNER_TEMP/ndk-libs"
 
@@ -60,12 +59,17 @@ jobs:
             NDK_LIBS_OUT="$RUNNER_TEMP/ndk-libs" \
             APP_ABI=arm64-v8a
 
-          test -s "$RUNNER_TEMP/ndk-libs/arm64-v8a/libaetherx_ui.so"
+          find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print
 
-      - name: Upload .so only
+          if ! find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print -quit | grep -q .; then
+            echo "ERROR: No .so library was produced."
+            exit 1
+          fi
+
+      - name: Upload .so files only
         uses: actions/upload-artifact@v4
         with:
           name: aetherx-ui-so-arm64-v8a
-          path: ${{ runner.temp }}/ndk-libs/arm64-v8a/libaetherx_ui.so
+          path: ${{ runner.temp }}/ndk-libs/**/*.so
           if-no-files-found: error
           retention-days: 7
