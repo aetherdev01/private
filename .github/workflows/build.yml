@@ -1,0 +1,54 @@
+name: Build AetherX UI Native Library
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/src/main/jni/AetherX_UI/**'
+      - 'app/src/main/jni/imgui/**'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ui-so:
+    name: Build UI-only .so (arm64-v8a)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build UI-only native library
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/jni/AetherX_UI/aether.cpp
+          test -f app/src/main/jni/AetherX_UI/Android.mk
+          test -f app/src/main/jni/AetherX_UI/Application.mk
+          test -f app/src/main/jni/imgui/imgui.cpp
+          mkdir -p "$RUNNER_TEMP/ndk-obj" "$RUNNER_TEMP/ndk-libs"
+          "$ANDROID_NDK_HOME/ndk-build" \
+            NDK_PROJECT_PATH="$GITHUB_WORKSPACE" \
+            APP_BUILD_SCRIPT="$GITHUB_WORKSPACE/app/src/main/jni/AetherX_UI/Android.mk" \
+            NDK_APPLICATION_MK="$GITHUB_WORKSPACE/app/src/main/jni/AetherX_UI/Application.mk" \
+            NDK_OUT="$RUNNER_TEMP/ndk-obj" \
+            NDK_LIBS_OUT="$RUNNER_TEMP/ndk-libs" \
+            APP_ABI=arm64-v8a
+          test -s "$RUNNER_TEMP/ndk-libs/arm64-v8a/libaetherx_ui.so"
+
+      - name: Upload only the .so file
+        uses: actions/upload-artifact@v4
+        with:
+          name: aetherx-ui-so-arm64-v8a
+          path: ${{ runner.temp }}/ndk-libs/arm64-v8a/*.so
+          if-no-files-found: error
+          retention-days: 7
