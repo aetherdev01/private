@@ -1,0 +1,5 @@
+# Referenced at /storage/emulated/0/THAKUR XD 64 BIT/app/build/bin/injected/AndroidManifest.xml:29
+-keep class com.alfas.xd.MainActivity { <init>(); }
+# Referenced at /storage/emulated/0/THAKUR XD 64 BIT/app/src/main/res/layout/activity_main.xml:2
+-keep class androidx.constraintlayout.widget.ConstraintLayout { <init>(...); }
+
