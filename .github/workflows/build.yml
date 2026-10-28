@@ -1,11 +1,10 @@
-name: Build AetherX UI Native Library
+name: Build All JNI Native Libraries
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'app/src/main/jni/AetherX_UI/**'
-      - 'app/src/main/jni/imgui/**'
+      - 'app/src/main/jni/**'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -13,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build UI Library
+    name: Build JNI - arm64-v8a
     runs-on: ubuntu-22.04
 
     steps:
@@ -38,38 +37,46 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
-      - name: Build native UI library
+      - name: Build all JNI modules
         shell: bash
         run: |
           set -euo pipefail
 
-          UI_DIR="$GITHUB_WORKSPACE/app/src/main/jni/AetherX_UI"
+          JNI_DIR="$GITHUB_WORKSPACE/app/src/main/jni"
+          test -d "$JNI_DIR"
 
-          test -f "$UI_DIR/Android.mk"
-          test -f "$UI_DIR/Application.mk"
-          test -f "$UI_DIR/aether.cpp"
+          echo "=== JNI build files ==="
+          find "$JNI_DIR" -type f \( -name Android.mk -o -name Application.mk \) -print
+
+          if [ ! -f "$JNI_DIR/Android.mk" ]; then
+            echo "::error::Tidak ditemukan Android.mk utama di app/src/main/jni/"
+            echo "Periksa lokasi Android.mk dan konfigurasi build."
+            exit 1
+          fi
 
           mkdir -p "$RUNNER_TEMP/ndk-obj" "$RUNNER_TEMP/ndk-libs"
 
           "$ANDROID_NDK_HOME/ndk-build" \
-            NDK_PROJECT_PATH="$GITHUB_WORKSPACE" \
-            APP_BUILD_SCRIPT="$UI_DIR/Android.mk" \
-            NDK_APPLICATION_MK="$UI_DIR/Application.mk" \
+            NDK_PROJECT_PATH="$JNI_DIR" \
+            APP_BUILD_SCRIPT="$JNI_DIR/Android.mk" \
+            NDK_APPLICATION_MK="$JNI_DIR/Application.mk" \
             NDK_OUT="$RUNNER_TEMP/ndk-obj" \
             NDK_LIBS_OUT="$RUNNER_TEMP/ndk-libs" \
-            APP_ABI=arm64-v8a
+            APP_ABI=arm64-v8a \
+            -j2
 
+          echo "=== Generated shared libraries ==="
           find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print
 
           if ! find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print -quit | grep -q .; then
-            echo "ERROR: No .so library was produced."
+            echo "::error::Build selesai tanpa menghasilkan file .so"
             exit 1
           fi
 
-      - name: Upload .so files only
+      - name: Upload only SO files
         uses: actions/upload-artifact@v4
         with:
-          name: aetherx-ui-so-arm64-v8a
+          name: jni-libraries-arm64-v8a
           path: ${{ runner.temp }}/ndk-libs/**/*.so
           if-no-files-found: error
           retention-days: 7
