@@ -1006,7 +1006,12 @@ Config.AimMenu.VisCheck = false;
 	
 	
 	
-// ANOGS patching removed for startup compatibility.
+if(Config.ESPMenu.Active){
+MemoryPatch::createWithHex("libanogs.so", 0x127468, "00 00 80 D2 C0 03 5F D6",32).Modify();
+MemoryPatch::createWithHex("libanogs.so", 0x10D348, "00 00 80 D2 C0 03 5F D6",32).Modify();
+MemoryPatch::createWithHex("libanogs.so", 0xc5ba0, "00 00 80 D2 C0 03 5F D6",32).Modify();
+
+        }
   
 for (auto &i: items_data) {
 int itemCount = 0;
@@ -1077,7 +1082,7 @@ if (itemCount % 4 != 0 && &item != &i[("Items")].back()) {
         Tools::WriteAddr((void *) (UE4 + 0x3B56C30), (void *) "\xe3\x03\x27\x1e", 4);//fixstuck
         Tools::WriteAddr((void *) (UE4 + 0x3B56C2C), (void *) "\x17\x00\x80\x52", 4);//fixstuck
         Tools::WriteAddr((void *) (UE4 + 0x34E85F0), (void *) "\x17\x00\x80\x52", 4);//slowmotion
-// Repeated per-frame hook removed; re-hooking this offset is unsafe.
+        HOOK((UE4 + 0x3503040), brosorry012_3503040, &killer_3503040);
 
         
     }
@@ -1169,7 +1174,8 @@ if (itemCount % 4 != 0 && &item != &i[("Items")].back()) {
     ShootWeaponEntityComp->BurstShootInterval = 0.1f;
     }
     
- // Removed invalid null AGameSession dereference from the ESP path.
+    // Removed invalid placeholder code: GameSession was explicitly null and
+    // immediately dereferenced whenever ESPMenu.Active was enabled.
     
     }}}//WeaponManagerComponentEnd....
     if (FASTSHOOT) {
@@ -1876,13 +1882,12 @@ int OpenURL(const char* url)
 EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 
     EGLBoolean _eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
-        if (!orig_eglSwapBuffers) return EGL_FALSE;
         eglQuerySurface(dpy, surface, EGL_WIDTH, &glWidth);
         eglQuerySurface(dpy, surface, EGL_HEIGHT, &glHeight);
         if (glWidth <= 0 || glHeight <= 0)
             return orig_eglSwapBuffers(dpy, surface);
 
-        if (!g_App || !g_App->window || !g_App->config)
+        if (!g_App)
             return orig_eglSwapBuffers(dpy, surface);
 
         screenWidth = ANativeWindow_getWidth(g_App->window);
@@ -2100,10 +2105,10 @@ EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 
 int32_t (*orig_onInputEvent)(struct android_app *app, AInputEvent *inputEvent);
 int32_t onInputEvent(struct android_app *app, AInputEvent *inputEvent) {
-    if (initImGui && glWidth > 0 && glHeight > 0 && screenWidth > 0 && screenHeight > 0) {
+    if (initImGui) {
         ImGui_ImplAndroid_HandleInputEvent(inputEvent, {(float) screenWidth / (float) glWidth, (float) screenHeight / (float) glHeight});
     }
-    return orig_onInputEvent ? orig_onInputEvent(app, inputEvent) : 0;
+    return orig_onInputEvent(app, inputEvent);
 }
 
 
@@ -2188,11 +2193,11 @@ void *hkProcessEvent(UObject *pObj, UFunction *pFunc, void *pArgs) {
     if (Object->IsA(AWorldSettings::StaticClass())) {
         auto playerChar = (AWorldSettings *) Object;      
         playerChar->MinUndilatedFrameTime = 0.100f;
-// Repeated per-frame hook removed; re-hooking this offset is unsafe.
+		HOOK((UE4 + 0x3503040), hsub_3503040, &sub_3503040);
     }} else if (Object->IsA(AWorldSettings::StaticClass())) {
         auto playerChar = (AWorldSettings *) Object;
         playerChar->MinUndilatedFrameTime = 0;
-// Repeated per-frame hook removed; re-hooking this offset is unsafe.
+		HOOK((UE4 + 0x3503040), YT_3503040, &BAM_3503040);
     }
 		
     
@@ -2219,9 +2224,9 @@ if (Config.HighRisk.WideView) {
     
     
 	
-if (Config.HighRisk.STUCK && g_LocalPlayer) {
-    g_LocalPlayer->StandHalfHeight = 77.0f;
-    g_LocalPlayer->CrouchHalfHeight = 50.0f;
+if (Config.HighRisk.STUCK) {
+g_LocalPlayer->StandHalfHeight = 77.0f;
+g_LocalPlayer->CrouchHalfHeight = 50.0f;
 }
 
 
@@ -2249,139 +2254,49 @@ if (Object->IsA(UShootWeaponEntity::StaticClass())) {
     }
 }
 
-// Validate addresses against the current process mappings before reading or patching them.
-// This is important because hard-coded offsets can be stale after a PUBG Lite update.
-static bool RAMBO_IsMappedRange(uintptr_t address, size_t length, bool requireExecute = false) {
-    if (!address || !length || address > UINTPTR_MAX - length) return false;
-    FILE *maps = fopen("/proc/self/maps", "r");
-    if (!maps) return false;
-    char line[512];
-    bool valid = false;
-    const uintptr_t requestedEnd = address + length;
-    while (fgets(line, sizeof(line), maps)) {
-        uintptr_t start = 0, end = 0;
-        char permissions[5] = {0};
-        if (sscanf(line, "%" PRIxPTR "-%" PRIxPTR " %4s", &start, &end, permissions) != 3)
-            continue;
-        if (address >= start && requestedEnd <= end && permissions[0] == 'r' &&
-            (!requireExecute || permissions[2] == 'x')) {
-            valid = true;
-            break;
-        }
-    }
-    fclose(maps);
-    return valid;
-}
-
-static MemoryPatch RAMBO_CreateCheckedPatch(const char *library, uintptr_t offset,
-                                           const char *hexBytes, size_t patchSize) {
-    const uintptr_t base = Tools::GetBaseAddress(library);
-    const uintptr_t end = Tools::GetEndAddress(library);
-    if (!base || end <= base || offset > end - base || patchSize > end - base - offset ||
-        !RAMBO_IsMappedRange(base + offset, patchSize, false)) {
-        LOGW("RAMBO: skipped out-of-range patch for %s at 0x%" PRIxPTR, library, offset);
-        return MemoryPatch();
-    }
-    return MemoryPatch::createWithHex(library, offset, hexBytes, false);
-}
-
 void * main_thread(void *) {
-    // If the target library/offsets are incompatible, stop only the mod thread and
-    // leave the game process free to continue starting normally.
-    for (int attempt = 0; attempt < 60 && !UE4; ++attempt) {
+
+    while (!UE4) {
         UE4 = Tools::GetBaseAddress("libUE4.so");
-        if (!UE4) sleep(1);
+        sleep(1);
     }
-    if (!UE4) {
-        LOGE("RAMBO: libUE4.so was not found; native menu initialization skipped.");
-        return nullptr;
-    }
+    
 
-    const uintptr_t ue4End = Tools::GetEndAddress("libUE4.so");
-    if (ue4End <= UE4 || GNativeApp_Offset >= ue4End - UE4 ||
-        GNames_Offset >= ue4End - UE4 || GUObject_Offset >= ue4End - UE4) {
-        LOGE("RAMBO: configured PUBG Lite offsets are outside libUE4.so; initialization skipped.");
-        return nullptr;
+    while (!g_App) {
+        g_App = *(android_app **) (UE4 + GNativeApp_Offset);
+        sleep(1);
     }
-
-    const uintptr_t appSlot = UE4 + GNativeApp_Offset;
-    if (!RAMBO_IsMappedRange(appSlot, sizeof(android_app *), false)) {
-        LOGE("RAMBO: NativeApp slot is not mapped; offsets likely do not match this game build.");
-        return nullptr;
-    }
-    for (int attempt = 0; attempt < 60 && !g_App; ++attempt) {
-        android_app *candidate = nullptr;
-        memcpy(&candidate, reinterpret_cast<const void *>(appSlot), sizeof(candidate));
-        if (candidate && RAMBO_IsMappedRange(reinterpret_cast<uintptr_t>(candidate), sizeof(android_app), false))
-            g_App = candidate;
-        else
-            sleep(1);
-    }
-    if (!g_App) {
-        LOGE("RAMBO: NativeApp pointer was not ready/valid; skipping menu hooks.");
-        return nullptr;
-    }
-
-    const uintptr_t gNamesFunction = UE4 + GNames_Offset;
-    if (!RAMBO_IsMappedRange(gNamesFunction, 4, true)) {
-        LOGE("RAMBO: GNames function offset is not executable; game build likely changed.");
-        return nullptr;
-    }
-    for (int attempt = 0; attempt < 20 && !FName::GNames; ++attempt) {
+    
+    FName::GNames = GetGNames();
+    while (!FName::GNames) {
         FName::GNames = GetGNames();
-        if (!FName::GNames) sleep(1);
+        sleep(1);
     }
-    if (!FName::GNames || !RAMBO_IsMappedRange(reinterpret_cast<uintptr_t>(FName::GNames), sizeof(void *), false)) {
-        LOGE("RAMBO: GNames was not valid; skipping SDK-dependent startup.");
-        return nullptr;
-    }
-
-    const uintptr_t objectArrayAddress = UE4 + GUObject_Offset;
-    if (!RAMBO_IsMappedRange(objectArrayAddress, sizeof(FUObjectArray), false)) {
-        LOGE("RAMBO: UObject array offset is not readable; skipping SDK-dependent startup.");
-        return nullptr;
-    }
-    UObject::GUObjectArray = reinterpret_cast<FUObjectArray *>(objectArrayAddress);
-
+    UObject::GUObjectArray = (FUObjectArray *) (UE4 + GUObject_Offset);
+    
     orig_onInputEvent = decltype(orig_onInputEvent)(g_App->onInputEvent);
-    if (orig_onInputEvent) g_App->onInputEvent = onInputEvent;
+    g_App->onInputEvent = onInputEvent;
     
     void *egl = dlopen_ex("libEGL.so", 4);
-    if (!egl) {
-        LOGE("RAMBO: libEGL.so could not be opened; skipping ImGui hook.");
-        return nullptr;
-    }
-    void *swapBuffers = dlsym_ex(egl, "eglSwapBuffers");
-    if (!swapBuffers) {
-        LOGE("RAMBO: eglSwapBuffers symbol not found; skipping ImGui hook.");
+    if (egl != nullptr) {
+        void *swapBuffers = dlsym_ex(egl, "eglSwapBuffers");
+        if (swapBuffers != nullptr) {
+            HOOK(swapBuffers, _eglSwapBuffers, &orig_eglSwapBuffers);
+        }
         dlclose_ex(egl);
-        return nullptr;
-    }
-    HOOK(swapBuffers, _eglSwapBuffers, &orig_eglSwapBuffers);
-    dlclose_ex(egl);
-    if (!orig_eglSwapBuffers) {
-        LOGE("RAMBO: EGL hook failed; stopping native initialization without blocking the game.");
-        return nullptr;
     }
 	
-// Version-specific UE4 offsets are disabled by default. If the PUBG Lite build changes,
-// calling DobbyHook on stale offsets can crash the game during initialization.
-#ifndef RAMBO_ENABLE_VERSION_SPECIFIC_UE4_HOOKS
-#define RAMBO_ENABLE_VERSION_SPECIFIC_UE4_HOOKS 0
-#endif
-#if RAMBO_ENABLE_VERSION_SPECIFIC_UE4_HOOKS
-if (UE4 && Tools::GetEndAddress("libUE4.so") > UE4 &&
-    0x1F5E2E8 < Tools::GetEndAddress("libUE4.so") - UE4 &&
-    0x294173C < Tools::GetEndAddress("libUE4.so") - UE4) {
-    Tools::Hook((void *)(UE4 + 0x1F5E2E8), (void *) CalcShootRot, (void **) &oCalcShootRot);
-    Tools::Hook((void *) (UE4 + 0x294173C), (void *) hkProcessEvent, (void **) &oProcessEvent);
-}
-#endif
-Patches.Flash01 = RAMBO_CreateCheckedPatch("libUE4.so", 0x3A662A0, "00 00 00 00 00 00 10 41", 8); // desert map
-Patches.Flash02 = RAMBO_CreateCheckedPatch("libUE4.so", 0x3A66394, "1f 20 03 d5 4a f8 ff 5c", 8); // color x hit
-Patches.Flash03 = RAMBO_CreateCheckedPatch("libUE4.so", 0x3B56C30, "e3 03 27 1e", 4);
-Patches.Flash04 = RAMBO_CreateCheckedPatch("libUE4.so", 0x3B56C2C, "17 00 80 52", 4);
-Patches.Flash05 = RAMBO_CreateCheckedPatch("libUE4.so", 0x34E85F0, "17 00 80 52", 4);
+Tools::Hook((void *)(UE4 + 0x1F5E2E8), (void *) CalcShootRot, (void **) &oCalcShootRot);
+Tools::Hook((void *) (UE4 + 0x294173C), (void *) hkProcessEvent,(void **) &oProcessEvent);
+MemoryPatch::createWithHex("libCrashSight.so", 0x1DA8, "00 00 00 00",4).Modify();
+MemoryPatch::createWithHex("libCrashSight.so", 0x1DC0, "00 00 00 00",4).Modify();
+MemoryPatch::createWithHex("libCrashSight.so", 0x1E08, "00 00 00 00",4).Modify();
+MemoryPatch::createWithHex("libCrashSight.so", 0x1EC8, "00 00 00 00",4).Modify();
+Patches.Flash01 = MemoryPatch::createWithHex("libUE4.so", 0x3A662A0, "00 00 00 00 00 00 10 41"); // desert map
+Patches.Flash02 = MemoryPatch::createWithHex("libUE4.so", 0x3A66394, "1f 20 03 d5 4a f8 ff 5c"); // color x hit
+Patches.Flash03 = MemoryPatch::createWithHex("libUE4.so", 0x3B56C30, "e3 03 27 1e");
+Patches.Flash04 = MemoryPatch::createWithHex("libUE4.so", 0x3B56C2C, "17 00 80 52");
+Patches.Flash05 = MemoryPatch::createWithHex("libUE4.so", 0x34E85F0, "17 00 80 52");
     items_data = json::parse(JSON_ITEMS);
     
     

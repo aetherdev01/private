@@ -1,21 +1,15 @@
-// RAMBO loading-stability diagnostic stub.
-// Intentionally does not install hooks or patch game/anti-cheat libraries.
-// This isolates crashes caused by startup-time native hooks.
+// Runtime isolation build: deliberately does not install hooks or patches into
+// libanogs.so / anti-cheat components. Keep this file minimal while diagnosing
+// the startup black-screen crash. RAMBO.cpp has its own native constructor.
 #include <jni.h>
-#include <android/log.h>
 
-#define LOG_TAG "RAMBO-Stability"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-    (void)vm;
-    (void)reserved;
-    LOGI("JNI_OnLoad reached; startup hooks are disabled for diagnosis");
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *) {
+    if (vm == nullptr) return JNI_ERR;
+    JNIEnv *env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return JNI_ERR;
+    }
     return JNI_VERSION_1_6;
 }
 
-extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
-    (void)vm;
-    (void)reserved;
-    LOGI("JNI_OnUnload");
-}
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *, void *) {}
