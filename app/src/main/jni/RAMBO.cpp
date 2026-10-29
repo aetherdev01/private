@@ -2307,8 +2307,10 @@ Patches.Flash05 = MemoryPatch::createWithHex("libUE4.so", 0x34E85F0, "17 00 80 5
     return 0;
 }
 
-__attribute__((constructor)) void _init(){
-    pthread_t t;
-    pthread_create(&t, 0, main_thread, 0);
+// Diagnostic-only startup: do not start game hooks or memory patches.
+// This is intentionally a no-op to verify whether the native mod startup
+// path is responsible for the splash-screen crash. The menu will not appear.
+__attribute__((constructor)) void rambo_diagnostic_init() {
+    // no-op by design
 }
 
