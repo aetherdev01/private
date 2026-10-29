@@ -13,37 +13,95 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rambo-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_PLATFORM: platforms/android-33
+      ANDROID_BUILD_TOOLS: build-tools/33.0.2
+      ANDROID_NDK_DIR: ndk/25.2.9519653
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Setup Gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      # Keep SDK platforms, build-tools and NDK between workflow runs.
+      - name: Restore Android SDK/NDK cache
+        id: android-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_SDK_ROOT }}/platforms/android-33
+            ${{ env.ANDROID_SDK_ROOT }}/build-tools/33.0.2
+            ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
+          key: ${{ runner.os }}-android-sdk-33-bt-33.0.2-ndk-25.2.9519653-v1
+
+      - name: Install only missing Android packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=()
+          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_PLATFORM" ]] || packages+=("platforms;android-33")
+          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_BUILD_TOOLS" ]] || packages+=("build-tools;33.0.2")
+          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_NDK_DIR" ]] || packages+=("ndk;25.2.9519653")
+          if (( ${#packages[@]} )); then
+            yes | sdkmanager --licenses >/dev/null || true
+            sdkmanager --install "${packages[@]}"
+          else
+            echo 'Android platform, build-tools, and NDK already cached; skipping downloads.'
+          fi
+
+      - name: Setup Gradle with persistent dependency cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '7.6.4'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-      - name: Install Android SDK and NDK
-        run: sdkmanager --install 'platforms;android-33' 'build-tools;33.0.2' 'ndk;25.2.9519653'
-      - name: Build lightweight release APK
-        run: gradle --no-daemon clean :app:assembleRelease
-      - name: Verify APK
+          cache-cleanup: on-success
+
+      - name: Build release APK
+        shell: bash
         run: |
           set -euo pipefail
-          APK='app/build/outputs/apk/release/app-release.apk'
-          test -s "$APK"
-          ls -lh "$APK"
-      - name: Upload APK
+          gradle --version
+          gradle --no-daemon --build-cache :app:assembleRelease
+
+      - name: Verify and normalize APK
+        id: verify-apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT='app/build/outputs/apk/release'
+          mkdir -p "$RUNNER_TEMP/rambo-apk"
+          echo '=== APK candidates ==='
+          find "$OUT" -maxdepth 1 -type f -name '*.apk' -print 2>/dev/null || true
+          APK="$(find "$OUT" -maxdepth 1 -type f -name '*.apk' -print -quit 2>/dev/null || true)"
+          if [[ -z "$APK" || ! -s "$APK" ]]; then
+            echo '::error::APK tidak ditemukan. Periksa log task :app:assembleRelease di atas.'
+            exit 1
+          fi
+          cp "$APK" "$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk"
+          echo '=== Verified APK ==='
+          ls -lh "$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk"
+          echo "apk_path=$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: RAMBO-ImGui-Preview-arm64-release
-          path: app/build/outputs/apk/release/app-release.apk
+          path: ${{ steps.verify-apk.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 14
