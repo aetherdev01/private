@@ -5,11 +5,6 @@
 #include <jni.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/rsa.h>
-#include <openssl/err.h>
-#include <openssl/md5.h>
 #include "Helper/obfuscate.h"
 #include "Tools.h"
 
@@ -290,64 +285,4 @@ uintptr_t Tools::String2Offset(const char *c) {
         return strtoul(c, nullptr, base);
     }
     return strtoull(c, nullptr, base);
-}
-
-const char *Tools::GetAndroidID(JNIEnv *env, jobject context) {
-    jclass contextClass = env->FindClass(OBFUSCATE("android/content/Context"));
-    jmethodID getContentResolverMethod = env->GetMethodID(contextClass, OBFUSCATE("getContentResolver"), OBFUSCATE("()Landroid/content/ContentResolver;"));
-    jclass settingSecureClass = env->FindClass(OBFUSCATE("android/provider/Settings$Secure"));
-    jmethodID getStringMethod = env->GetStaticMethodID(settingSecureClass, OBFUSCATE("getString"), OBFUSCATE("(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;"));
-
-    auto obj = env->CallObjectMethod(context, getContentResolverMethod);
-    auto str = (jstring) env->CallStaticObjectMethod(settingSecureClass, getStringMethod, obj, env->NewStringUTF(OBFUSCATE("android_id")));
-    return env->GetStringUTFChars(str, 0);
-}
-
-const char *Tools::GetDeviceModel(JNIEnv *env) {
-	jclass buildClass = env->FindClass(OBFUSCATE("android/os/Build"));
-	jfieldID modelId = env->GetStaticFieldID(buildClass, OBFUSCATE("MODEL"), OBFUSCATE("Ljava/lang/String;"));
-	
-	auto str = (jstring) env->GetStaticObjectField(buildClass, modelId);
-	return env->GetStringUTFChars(str, 0);
-}
-
-const char *Tools::GetDeviceBrand(JNIEnv *env) {
-	jclass buildClass = env->FindClass(OBFUSCATE("android/os/Build"));
-	jfieldID modelId = env->GetStaticFieldID(buildClass, OBFUSCATE("BRAND"), OBFUSCATE("Ljava/lang/String;"));
-	
-	auto str = (jstring) env->GetStaticObjectField(buildClass, modelId);
-	return env->GetStringUTFChars(str, 0);
-}
-
-const char *Tools::GetDeviceUniqueIdentifier(JNIEnv *env, const char *uuid) {
-    jclass uuidClass = env->FindClass(OBFUSCATE("java/util/UUID"));
-
-    auto len = strlen(uuid);
-
-    jbyteArray myJByteArray = env->NewByteArray(len);
-    env->SetByteArrayRegion(myJByteArray, 0, len, (jbyte *) uuid);
-
-    jmethodID nameUUIDFromBytesMethod = env->GetStaticMethodID(uuidClass, OBFUSCATE("nameUUIDFromBytes"), OBFUSCATE("([B)Ljava/util/UUID;"));
-    jmethodID toStringMethod = env->GetMethodID(uuidClass, OBFUSCATE("toString"), OBFUSCATE("()Ljava/lang/String;"));
-
-    auto obj = env->CallStaticObjectMethod(uuidClass, nameUUIDFromBytesMethod, myJByteArray);
-    auto str = (jstring) env->CallObjectMethod(obj, toStringMethod);
-    return env->GetStringUTFChars(str, 0);
-}
-
-std::string Tools::CalcMD5(std::string s) {
-    std::string result;
-
-    unsigned char hash[MD5_DIGEST_LENGTH];
-    char tmp[4];
-
-    MD5_CTX md5;
-    MD5_Init(&md5);
-    MD5_Update(&md5, s.c_str(), s.length());
-    MD5_Final(hash, &md5);
-    for (unsigned char i : hash) {
-        sprintf(tmp, "%02x", i);
-        result += tmp;
-    }
-    return result;
 }

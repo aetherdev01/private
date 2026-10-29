@@ -1,13 +1,9 @@
 #pragma once
 
 #include <map>
-#include <jni.h>
 #include <stdio.h>
 #include <cstring>
 #include <string.h>
-#include <curl/curl.h>
-#include <openssl/rsa.h>
-#include <openssl/pem.h>
 #include "Dobby/dobby.h"
 
 uintptr_t getBaseAddress(std::string_view name);
@@ -34,9 +30,4 @@ namespace Tools {
 	uintptr_t GetRealOffsets(const char *libraryName, uintptr_t relativeAddr);
 	uintptr_t String2Offset(const char *c);
 	
-	const char *GetAndroidID(JNIEnv *env, jobject context);
-	const char *GetDeviceModel(JNIEnv *env);
-	const char *GetDeviceBrand(JNIEnv *env);
-	const char *GetDeviceUniqueIdentifier(JNIEnv *env, const char *uuid);
-	std::string CalcMD5(std::string s);
 }

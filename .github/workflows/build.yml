@@ -1,107 +1,125 @@
-name: Build RAMBO ImGui APK
+name: Build RAMBO .so
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle.properties'
+      - 'app/src/main/jni/**'
       - '.github/workflows/build.yml'
 
 permissions:
   contents: read
 
 concurrency:
-  group: rambo-apk-${{ github.ref }}
+  group: rambo-native-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-apk:
+  build-so:
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 20
     env:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
       ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_PLATFORM: platforms/android-33
-      ANDROID_BUILD_TOOLS: build-tools/33.0.2
-      ANDROID_NDK_DIR: ndk/25.2.9519653
+      NDK_VERSION: 25.2.9519653
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      # Keep SDK platforms, build-tools and NDK between workflow runs.
-      - name: Restore Android SDK/NDK cache
-        id: android-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.ANDROID_SDK_ROOT }}/platforms/android-33
-            ${{ env.ANDROID_SDK_ROOT }}/build-tools/33.0.2
-            ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
-          key: ${{ runner.os }}-android-sdk-33-bt-33.0.2-ndk-25.2.9519653-v1
-
-      - name: Install only missing Android packages
+      - name: Validate native source dependencies
         shell: bash
         run: |
           set -euo pipefail
-          packages=()
-          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_PLATFORM" ]] || packages+=("platforms;android-33")
-          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_BUILD_TOOLS" ]] || packages+=("build-tools;33.0.2")
-          [[ -d "$ANDROID_SDK_ROOT/$ANDROID_NDK_DIR" ]] || packages+=("ndk;25.2.9519653")
-          if (( ${#packages[@]} )); then
-            yes | sdkmanager --licenses >/dev/null || true
-            sdkmanager --install "${packages[@]}"
-          else
-            echo 'Android platform, build-tools, and NDK already cached; skipping downloads.'
-          fi
-
-      - name: Setup Gradle with persistent dependency cache
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '7.6.4'
-          cache-cleanup: on-success
-
-      - name: Build release APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle --version
-          gradle --no-daemon --build-cache :app:assembleRelease
-
-      - name: Verify and normalize APK
-        id: verify-apk
-        shell: bash
-        run: |
-          set -euo pipefail
-          OUT='app/build/outputs/apk/release'
-          mkdir -p "$RUNNER_TEMP/rambo-apk"
-          echo '=== APK candidates ==='
-          find "$OUT" -maxdepth 1 -type f -name '*.apk' -print 2>/dev/null || true
-          APK="$(find "$OUT" -maxdepth 1 -type f -name '*.apk' -print -quit 2>/dev/null || true)"
-          if [[ -z "$APK" || ! -s "$APK" ]]; then
-            echo '::error::APK tidak ditemukan. Periksa log task :app:assembleRelease di atas.'
+          JNI="$GITHUB_WORKSPACE/app/src/main/jni"
+          required=(
+            "${JNI}/Helper/obfuscate.h"
+            "${JNI}/Helper/json.hpp"
+            "${JNI}/Helper/fake_dlfcn.h"
+            "${JNI}/Helper/fake_dlfcn.cpp"
+            "${JNI}/Helper/ElfImg.cpp"
+            "${JNI}/Helper/plthook.h"
+            "${JNI}/Helper/plthook_elf.cpp"
+            "${JNI}/Helper/Items.h"
+            "${JNI}/Helper/Vehicle.h"
+            "${JNI}/Helper/LootBox.h"
+            "${JNI}/Helper/Vector2.hpp"
+            "${JNI}/Helper/Vector3.hpp"
+            "${JNI}/SDK/LITE_Basic.cpp"
+            "${JNI}/SDK/LITE_Basic_functions.cpp"
+            "${JNI}/SDK/LITE_Engine_functions.cpp"
+            "${JNI}/SDK/LITE_Client_functions.cpp"
+            "${JNI}/SDK/LITE_CoreUObject_functions.cpp"
+            "${JNI}/SDK/LITE_ShadowTrackerExtra_functions.cpp"
+            "${JNI}/Dobby/arm64-v8a/libdobby.a"
+          )
+          missing=()
+          for file in "${required[@]}"; do
+            [[ -f "$file" ]] || missing+=("${file#${GITHUB_WORKSPACE}/}")
+          done
+          if (( ${#missing[@]} )); then
+            echo '::error::Cannot build RAMBO.cpp yet; required native project files are missing:'
+            printf ' - %s\n' "${missing[@]}"
+            echo 'Add the original Helper, SDK, and Dobby source/dependency files to the repository. No preview library will be built as a fallback.'
             exit 1
           fi
-          cp "$APK" "$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk"
-          echo '=== Verified APK ==='
-          ls -lh "$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk"
-          echo "apk_path=$RUNNER_TEMP/rambo-apk/RAMBO-ImGui-Preview-arm64-release.apk" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK artifact
+      - name: Restore Android NDK cache
+        id: ndk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
+          key: ${{ runner.os }}-android-ndk-${{ env.NDK_VERSION }}-rambo-native-v2
+
+      - name: Locate or install NDK only when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
+          if [[ -x "$NDK/ndk-build" ]]; then
+            echo "Using cached/preinstalled NDK: $NDK"
+          else
+            echo "NDK not present in cache; installing only NDK $NDK_VERSION"
+            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort | tail -n1)"
+            if [[ -z "$SDKMANAGER" ]]; then
+              echo '::error::sdkmanager was not found on this runner.'
+              exit 1
+            fi
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" --install "ndk;$NDK_VERSION"
+          fi
+          echo "NDK_HOME=$NDK" >> "$GITHUB_ENV"
+
+      - name: Build native RAMBO shared library only
+        shell: bash
+        run: |
+          set -euo pipefail
+          JNI="$GITHUB_WORKSPACE/app/src/main/jni"
+          OUT="$RUNNER_TEMP/rambo-native-build"
+          mkdir -p "$OUT/libs" "$OUT/obj"
+          "$NDK_HOME/ndk-build" \
+            NDK_PROJECT_PATH="$JNI" \
+            APP_BUILD_SCRIPT="$JNI/Android.mk" \
+            NDK_APPLICATION_MK="$JNI/Application.mk" \
+            NDK_LIBS_OUT="$OUT/libs" \
+            NDK_OUT="$OUT/obj" \
+            APP_ABI=arm64-v8a \
+            APP_OPTIM=release \
+            -j"$(nproc)"
+          SO="$OUT/libs/arm64-v8a/libRAMBOSRC.so"
+          if [[ ! -s "$SO" ]]; then
+            echo '::error::Build finished but libRAMBOSRC.so was not produced.'
+            find "$OUT" -type f -maxdepth 5 -print || true
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/rambo-so-artifact"
+          cp "$SO" "$RUNNER_TEMP/rambo-so-artifact/libRAMBOSRC.so"
+          file "$RUNNER_TEMP/rambo-so-artifact/libRAMBOSRC.so"
+          ls -lh "$RUNNER_TEMP/rambo-so-artifact/libRAMBOSRC.so"
+
+      - name: Upload RAMBO .so artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RAMBO-ImGui-Preview-arm64-release
-          path: ${{ steps.verify-apk.outputs.apk_path }}
+          name: RAMBO-arm64-v8a-so
+          path: ${{ runner.temp }}/rambo-so-artifact/libRAMBOSRC.so
           if-no-files-found: error
           retention-days: 14

@@ -1,11 +1,7 @@
 #include "Includes.h"
-#include "FTools/Font.h"
-#include "FTools/Icon.h"
-#include "FTools/ImguiPP.h"
 #include "Helper/obfuscate.h"
 #include "Helper/fake_dlfcn.h"
 #include "Helper/plthook.h"
-#include "Helper/StrEnc.h"
 
 #include "Helper/json.hpp"
 using json = nlohmann::json;
@@ -21,66 +17,15 @@ using namespace SDK;
 #include "Helper/Vector3.hpp"
 #include "KittyMemory/MemoryPatch.h"
 
-#include "Iconcpp.h"
-#include "CN.h"
 #include "FloatingLogoTexture.h"
 
 
-static char s[64] = { "" };
-std::string GetPackage() {
-FILE *f = fopen("/proc/self/cmdline", "rb");
-if (f) {
-char *buf = new char[64];
-fread(buf, sizeof(char), 64, f);
-fclose(f);
-return buf;
-}
-return 0;
-}
-void loadConfigg() {
-std::string PackName;
-PackName += "/storage/emulated/0/Android/data/";
-PackName += GetPackage();
-PackName += "/files/L8Rkey.ini";
-FILE *file = fopen(PackName.c_str(), "rb");
-if (file) {
-   fseek(file, 0, SEEK_END);
-   long fileSize = ftell(file);
-   fseek(file, 0, SEEK_SET);
-
-   s[0] = '\0';
-   fread(&s[0], sizeof(char), sizeof(s), file);
-   fclose(file);
-}
-}
-
-void saveConfigg() {
-std::string PackName;
-PackName += "/storage/emulated/0/Android/data/";
-PackName += GetPackage();
-PackName += "/files/ZevaLite.ini";
-FILE *file = fopen(PackName.c_str(), "wb");
-if (file) {
-   fwrite(&s[0], sizeof(char), sizeof(s), file);
-   fclose(file);
-}
-}
-
-void loadKey() {
-loadConfigg();
-}
-
-void saveKey() {
-saveConfigg();
-}
 // ======================================================================== //
 int screenWidth = -1, glWidth, screenHeight = -1, glHeight;
 float density = -1;
 
 json items_data;
 time_t rng = 0;
-std::string g_Token, g_Auth;
-bool bValid = false;
 bool initImGui = false;
 bool FASTSHOOT = true;
 float ControlSpeed = 0.25f;
@@ -1666,7 +1611,6 @@ PBox = IM_COL32(255, 0, 0, 255);
                                 std::vector<std::string> lines = {
                                     "<<Winner Winner Chicken Dinner >>",
 									"<< VEER SINGH  >>",
-                                    "<< BUY KEY-: @THAKURXD1 >>",
                                      "<<   Restart Your Game >>"};
 
                                 float textPosY = 420; 
@@ -1700,7 +1644,7 @@ PBox = IM_COL32(255, 0, 0, 255);
                                 auto mWidth = 85.0f - mWidthScale;
                                 auto mHeight = mWidth * 0.07f;
                                 std::string s = GetVehicleName(Vehicle);
-                                s += ICON_FA_CAR" [";
+                                s += " [";
                                 s += std::to_string((int)Distance);
                                 s += "m]";
                                 auto textSize = ImGui::CalcTextSize(s.c_str(), 0, s.size());
@@ -1906,222 +1850,6 @@ Vector3 CalcShootTargetLocByStartAndRot(void *pObj, Vector3 Start, FRotator Shoo
 }
 
 
-// ======================================================================== //
-std::string getClipboardText() {
-    if (!g_App)
-        return "";
-
-    auto activity = g_App->activity;
-    if (!activity)
-        return "";
-
-    auto vm = activity->vm;
-    if (!vm)
-        return "";
-
-    auto object = activity->clazz;
-    if (!object)
-        return "";
-
-    std::string result;
-
-    JNIEnv *env;
-    vm->AttachCurrentThread(&env, 0);
-    {
-        auto ContextClass = env->FindClass("android/content/Context");
-        auto getSystemServiceMethod = env->GetMethodID(ContextClass, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
-        auto str = env->NewStringUTF("clipboard");
-        auto clipboardManager = env->CallObjectMethod(object, getSystemServiceMethod, str);
-        env->DeleteLocalRef(str);
-        auto ClipboardManagerClass = env->FindClass("android/content/ClipboardManager");
-        auto getText = env->GetMethodID(ClipboardManagerClass, "getText", "()Ljava/lang/CharSequence;");
-        auto CharSequenceClass = env->FindClass("java/lang/CharSequence");
-        auto toStringMethod = env->GetMethodID(CharSequenceClass, "toString", "()Ljava/lang/String;");
-        auto text = env->CallObjectMethod(clipboardManager, getText);
-        if (text) {
-            str = (jstring) env->CallObjectMethod(text, toStringMethod);
-            result = env->GetStringUTFChars(str, 0);
-            env->DeleteLocalRef(str);
-            env->DeleteLocalRef(text);
-        }
-
-        env->DeleteLocalRef(CharSequenceClass);
-        env->DeleteLocalRef(ClipboardManagerClass);
-        env->DeleteLocalRef(clipboardManager);
-        env->DeleteLocalRef(ContextClass);
-    }
-    vm->DetachCurrentThread();
-
-    return result;
-}
-// ======================================================================== //
-const char *GetAndroidID(JNIEnv *env, jobject context) {
-    jclass contextClass = env->FindClass(/*android/content/Context*/ StrEnc("`L+&0^[S+-:J^$,r9q92(as", "\x01\x22\x4F\x54\x5F\x37\x3F\x7C\x48\x42\x54\x3E\x3B\x4A\x58\x5D\x7A\x1E\x57\x46\x4D\x19\x07", 23).c_str());
-    jmethodID getContentResolverMethod = env->GetMethodID(contextClass, /*getContentResolver*/ StrEnc("E8X\\7r7ys_Q%JS+L+~", "\x22\x5D\x2C\x1F\x58\x1C\x43\x1C\x1D\x2B\x03\x40\x39\x3C\x47\x3A\x4E\x0C", 18).c_str(), /*()Landroid/content/ContentResolver;*/ StrEnc("8^QKmj< }5D:9q7f.BXkef]A*GYLNg}B!/L", "\x10\x77\x1D\x2A\x03\x0E\x4E\x4F\x14\x51\x6B\x59\x56\x1F\x43\x03\x40\x36\x77\x28\x0A\x08\x29\x24\x44\x33\x0B\x29\x3D\x08\x11\x34\x44\x5D\x77", 35).c_str());
-    jclass settingSecureClass = env->FindClass(/*android/provider/Settings$Secure*/ StrEnc("T1yw^BCF^af&dB_@Raf}\\FS,zT~L(3Z\"", "\x35\x5F\x1D\x05\x31\x2B\x27\x69\x2E\x13\x09\x50\x0D\x26\x3A\x32\x7D\x32\x03\x09\x28\x2F\x3D\x4B\x09\x70\x2D\x29\x4B\x46\x28\x47", 32).c_str());
-    jmethodID getStringMethod = env->GetStaticMethodID(settingSecureClass, /*getString*/ StrEnc("e<F*J5c0Y", "\x02\x59\x32\x79\x3E\x47\x0A\x5E\x3E", 9).c_str(), /*(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;*/ StrEnc("$6*%R*!XO\"m18o,0S!*`uI$IW)l_/_knSdlRiO1T`2sH|Ouy__^}%Y)JsQ:-\"(2_^-$i{?H", "\x0C\x7A\x4B\x4B\x36\x58\x4E\x31\x2B\x0D\x0E\x5E\x56\x1B\x49\x5E\x27\x0E\x69\x0F\x1B\x3D\x41\x27\x23\x7B\x09\x2C\x40\x33\x1D\x0B\x21\x5F\x20\x38\x08\x39\x50\x7B\x0C\x53\x1D\x2F\x53\x1C\x01\x0B\x36\x31\x39\x46\x0C\x15\x43\x2B\x05\x30\x15\x41\x43\x46\x55\x70\x0D\x59\x56\x00\x15\x58\x73", 71).c_str());
-
-    auto obj = env->CallObjectMethod(context, getContentResolverMethod);
-    auto str = (jstring) env->CallStaticObjectMethod(settingSecureClass, getStringMethod, obj, env->NewStringUTF(/*android_id*/ StrEnc("ujHO)8OfOE", "\x14\x04\x2C\x3D\x46\x51\x2B\x39\x26\x21", 10).c_str()));
-    return env->GetStringUTFChars(str, 0);
-}
-
-const char *GetDeviceModel(JNIEnv *env) {
-    jclass buildClass = env->FindClass(/*android/os/Build*/ StrEnc("m5I{GKGWBP-VOxkA", "\x0C\x5B\x2D\x09\x28\x22\x23\x78\x2D\x23\x02\x14\x3A\x11\x07\x25", 16).c_str());
-    jfieldID modelId = env->GetStaticFieldID(buildClass, /*MODEL*/ StrEnc("|}[q:", "\x31\x32\x1F\x34\x76", 5).c_str(), /*Ljava/lang/String;*/ StrEnc(".D:C:ETZ1O-Ib&^h.Y", "\x62\x2E\x5B\x35\x5B\x6A\x38\x3B\x5F\x28\x02\x1A\x16\x54\x37\x06\x49\x62", 18).c_str());
-
-    auto str = (jstring) env->GetStaticObjectField(buildClass, modelId);
-    return env->GetStringUTFChars(str, 0);
-}
-
-const char *GetDeviceBrand(JNIEnv *env) {
-    jclass buildClass = env->FindClass(/*android/os/Build*/ StrEnc("0iW=2^>0zTRB!B90", "\x51\x07\x33\x4F\x5D\x37\x5A\x1F\x15\x27\x7D\x00\x54\x2B\x55\x54", 16).c_str());
-    jfieldID modelId = env->GetStaticFieldID(buildClass, /*BRAND*/ StrEnc("@{[FP", "\x02\x29\x1A\x08\x14", 5).c_str(), /*Ljava/lang/String;*/ StrEnc(".D:C:ETZ1O-Ib&^h.Y", "\x62\x2E\x5B\x35\x5B\x6A\x38\x3B\x5F\x28\x02\x1A\x16\x54\x37\x06\x49\x62", 18).c_str());
-
-    auto str = (jstring) env->GetStaticObjectField(buildClass, modelId);
-    return env->GetStringUTFChars(str, 0);
-}
-
-const char *GetPackageName(JNIEnv *env, jobject context) {
-    jclass contextClass = env->FindClass(/*android/content/Context*/ StrEnc("`L+&0^[S+-:J^$,r9q92(as", "\x01\x22\x4F\x54\x5F\x37\x3F\x7C\x48\x42\x54\x3E\x3B\x4A\x58\x5D\x7A\x1E\x57\x46\x4D\x19\x07", 23).c_str());
-    jmethodID getPackageNameId = env->GetMethodID(contextClass, /*getPackageName*/ StrEnc("YN4DaP)!{wRGN}", "\x3E\x2B\x40\x14\x00\x33\x42\x40\x1C\x12\x1C\x26\x23\x18", 14).c_str(), /*()Ljava/lang/String;*/ StrEnc("VnpibEspM(b]<s#[9cQD", "\x7E\x47\x3C\x03\x03\x33\x12\x5F\x21\x49\x0C\x3A\x13\x20\x57\x29\x50\x0D\x36\x7F", 20).c_str());
-
-    auto str = (jstring) env->CallObjectMethod(context, getPackageNameId);
-    return env->GetStringUTFChars(str, 0);
-}
-
-const char *GetDeviceUniqueIdentifier(JNIEnv *env, const char *uuid) {
-    jclass uuidClass = env->FindClass(/*java/util/UUID*/ StrEnc("B/TxJ=3BZ_]SFx", "\x28\x4E\x22\x19\x65\x48\x47\x2B\x36\x70\x08\x06\x0F\x3C", 14).c_str());
-
-    auto len = strlen(uuid);
-
-    jbyteArray myJByteArray = env->NewByteArray(len);
-    env->SetByteArrayRegion(myJByteArray, 0, len, (jbyte *) uuid);
-
-    jmethodID nameUUIDFromBytesMethod = env->GetStaticMethodID(uuidClass, /*nameUUIDFromBytes*/ StrEnc("P6LV|'0#A+zQmoat,", "\x3E\x57\x21\x33\x29\x72\x79\x67\x07\x59\x15\x3C\x2F\x16\x15\x11\x5F", 17).c_str(), /*([B)Ljava/util/UUID;*/ StrEnc("sW[\"Q[W3,7@H.vT0) xB", "\x5B\x0C\x19\x0B\x1D\x31\x36\x45\x4D\x18\x35\x3C\x47\x1A\x7B\x65\x7C\x69\x3C\x79", 20).c_str());
-    jmethodID toStringMethod = env->GetMethodID(uuidClass, /*toString*/ StrEnc("2~5292eW", "\x46\x11\x66\x46\x4B\x5B\x0B\x30", 8).c_str(), /*()Ljava/lang/String;*/ StrEnc("P$BMc' #j?<:myTh_*h0", "\x78\x0D\x0E\x27\x02\x51\x41\x0C\x06\x5E\x52\x5D\x42\x2A\x20\x1A\x36\x44\x0F\x0B", 20).c_str());
-
-    auto obj = env->CallStaticObjectMethod(uuidClass, nameUUIDFromBytesMethod, myJByteArray);
-    auto str = (jstring) env->CallObjectMethod(obj, toStringMethod);
-    return env->GetStringUTFChars(str, 0);
-}
-
-struct MemoryStruct {
-    char *memory;
-    size_t size;
-};
-
-static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *) userp;
-
-    mem->memory = (char *) realloc(mem->memory, mem->size + realsize + 1);
-    if (mem->memory == NULL) {
-        return 0;
-    }
-
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
-
-    return realsize;
-}
-
-//=========================MAIN LOGIN =================//
-  
-
-std::string Login(const char *user_key) {
-        if (!g_App)
-            return "Internal Error";
-        auto activity = g_App->activity;
-        if (!activity)
-            return "Internal Error";
-        auto vm = activity->vm;
-        if (!vm)
-            return "Internal Error";
-        auto object = activity->clazz;
-        if (!object)
-            return "Internal Error";
-        JNIEnv *env;
-        vm->AttachCurrentThread(&env, 0);
-        std::string hwid = user_key;
-        hwid += GetAndroidID(env, object);
-        hwid += GetDeviceModel(env);
-        hwid += GetDeviceBrand(env);
-        std::string UUID = GetDeviceUniqueIdentifier(env, hwid.c_str());
-        vm->DetachCurrentThread();
-        std::string errMsg;
-        struct MemoryStruct chunk{};
-        chunk.memory = (char *) malloc(1);
-        chunk.size = 0;
-        CURL *curl;
-        CURLcode res;
-        curl = curl_easy_init();
-        if (curl) {
-        std::string m2hpampa = "https://ramboprivate.modkey.store/public/connect";
-        std::string sRedLink = m2hpampa;
-        curl_easy_setopt(curl, CURLOPT_URL, sRedLink.c_str());
-		curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, "sha256//XPPKYWdT6hBIzbqXVgE46kif2eD5r8vzlv7+DyrVhOg=");
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, /*https*/ StrEnc("!mLBO", "\x49\x19\x38\x32\x3C", 5).c_str());
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, /*Content-Type: application/x-www-form-urlencoded*/ StrEnc("@;Ls\\(KP4Qrop`b#d3094/r1cf<c<=H)AiiBG6i|Ta66s2[", "\x03\x54\x22\x07\x39\x46\x3F\x7D\x60\x28\x02\x0A\x4A\x40\x03\x53\x14\x5F\x59\x5A\x55\x5B\x1B\x5E\x0D\x49\x44\x4E\x4B\x4A\x3F\x04\x27\x06\x1B\x2F\x6A\x43\x1B\x10\x31\x0F\x55\x59\x17\x57\x3F", 47).c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        char data[4096];
-        sprintf(data, /*game=PUBG&user_key=%s&serial=%s*/ StrEnc("qu2yXK,YkJyGD@ut0.u~Nb'5(:.:chK", "\x16\x14\x5F\x1C\x65\x1B\x79\x1B\x2C\x6C\x0C\x34\x21\x32\x2A\x1F\x55\x57\x48\x5B\x3D\x44\x54\x50\x5A\x53\x4F\x56\x5E\x4D\x38", 31).c_str(), user_key, UUID.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &chunk);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        res = curl_easy_perform(curl);
-        if (res == CURLE_OK) {
-            try {
-                json result = json::parse(chunk.memory);
-                if (result[/*status*/ StrEnc("(>_LBm", "\x5B\x4A\x3E\x38\x37\x1E", 6).c_str()] == true) {
-
-              std::string token = result[/*data*/ StrEnc("fAVA", "\x02\x20\x22\x20", 4).c_str()][/*token*/ StrEnc("{>3Lr", "\x0F\x51\x58\x29\x1C", 5).c_str()].get<std::string>();
-                    time_t rng = result[/*data*/ StrEnc("fAVA", "\x02\x20\x22\x20", 4).c_str()][/*rng*/ StrEnc("+n,", "\x59\x00\x4B", 3).c_str()].get<time_t>();
-     if (rng + 30 > time(0)) {
-                        std::string auth = /*PUBG*/ StrEnc("Q*) ", "\x01\x7F\x6B\x67", 4).c_str();;
-                        auth += "-";
-                        auth += user_key;
-                        auth += "-";
-                        auth += UUID;
-                        auth += "-";
-                        auth += /*Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E*/ StrEnc("-2:uwZdV^%]?{{wHs2V,+(^NJU;kC*_{", "\x7B\x5F\x02\x39\x1C\x6D\x31\x3C\x6C\x6F\x30\x4C\x11\x38\x27\x1E\x23\x64\x3C\x5E\x67\x49\x69\x34\x2D\x33\x43\x58\x36\x50\x66\x3E", 32).c_str();
-                        std::string outputAuth = Tools::CalcMD5(auth);
-
-                        g_Token = token;
-                        g_Auth = outputAuth;
-
-                              g_Token = token;
-                        g_Auth = outputAuth;
-
-                        bValid = g_Token == g_Auth;
-                        
-                    }
-                } else {
-                    errMsg = result[/*reason*/ StrEnc("LW(3(c", "\x3E\x32\x49\x40\x47\x0D", 6).c_str()].get<std::string>();
-
-}
-            } catch (json::exception &e) {
-                errMsg = "{";
-                errMsg += e.what();
-                errMsg += "}\n{";
-                errMsg += chunk.memory;
-                errMsg += "}";
-            }
-        } else {
-            errMsg = curl_easy_strerror(res);
-        }
-    }
-    curl_easy_cleanup(curl);
-
-    return bValid ? "OK" : errMsg;
-}
-
-// ======================================================================== //
 void DrawTextCentered(const char *text)
 {
     ImGui::Separator();
@@ -2173,54 +1901,13 @@ EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
     if (!initImGui) {
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
-        ImGuiStyle& style = ImGui::GetStyle();
-        // Keep Dear ImGui's stock dark palette; only adjust layout metrics.
-        style.WindowPadding = ImVec2(12.0f, 10.0f);
-        style.FramePadding = ImVec2(8.0f, 6.0f);
-        style.ItemSpacing = ImVec2(8.0f, 7.0f);
-        style.WindowRounding = 6.0f;
-        style.ChildRounding = 4.0f;
-        style.FrameRounding = 4.0f;
-        style.PopupRounding = 4.0f;
-        style.ScrollbarRounding = 5.0f;
-        style.GrabRounding = 4.0f;
-        style.TabRounding = 4.0f;
-        style.WindowBorderSize = 1.0f;
-        style.FrameBorderSize = 0.0f;
-        style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
-        style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
-        ImFontConfig CustomFont;
-
-        style.ScaleAllSizes(std::max(1.0f, density / 420.0f));
-        style.ScrollbarSize /= 1;
-
 
         ImGui_ImplAndroid_Init();
         ImGui_ImplOpenGL3_Init("#version 300 es");
         ImGuiIO & io = ImGui::GetIO();
-        io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.IniFilename = NULL;
         
-        static const ImWchar icons_ranges[] = {0xf000, 0xf3ff, 0};
-        ImFontConfig icons_config;
-      //  ImFontConfig CustomFont;
-        CustomFont.FontDataOwnedByAtlas = false;
-        
-        icons_config.MergeMode = true;
-        icons_config.PixelSnapH = true;
-        icons_config.OversampleH = 2.5;
-        icons_config.OversampleV = 2.5;
-
-          io.Fonts->AddFontFromMemoryTTF((void *)BaiduZY_data, BaiduZY_size, 25.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
-          io.Fonts->AddFontFromMemoryCompressedTTF(font_awesome_data, font_awesome_size, 28.0f, &icons_config, icons_ranges);
-          io.Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t*>(Custom), sizeof(Custom), 24.f, &CustomFont);
-       //   memset(&Config, 0, sizeof(sConfig));
-        
-        
-       // Config.HighRisk.WideView = true;
-        ImFontConfig cfg;
-        cfg.SizePixels = ((float) density / 20.0f);
-        io.Fonts->AddFontDefault(&cfg);
+        // Use Dear ImGui built-in default font and stock style.
         memset(&Config, 0, sizeof(sConfig));
         
         initImGui = true;
@@ -2233,169 +1920,136 @@ EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
     
     DrawESP(ImGui::GetBackgroundDrawList());
 
-    // The floating logo toggles this menu; it is drawn last so it stays above the panel.
+    // The floating logo toggles the native RAMBO menu.
     static bool showModMenu = false;
-    static bool isLogin = false;
-    static std::string authError;
     if (showModMenu) {
-    const float menuWidth = std::min(760.0f, std::max(360.0f, (float)glWidth * 0.62f));
-    const float menuHeight = std::min(650.0f, std::max(330.0f, (float)glHeight * 0.80f));
-    ImGui::SetNextWindowPos(ImVec2((float)glWidth * 0.5f, (float)glHeight * 0.5f),
-                            ImGuiCond_Once, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_Once);
+        const float menuWidth = std::min(760.0f, std::max(320.0f, (float)glWidth * 0.62f));
+        const float menuHeight = std::min(650.0f, std::max(300.0f, (float)glHeight * 0.82f));
+        ImGui::SetNextWindowPos(ImVec2((float)glWidth * 0.5f, (float)glHeight * 0.5f),
+                                ImGuiCond_Once, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_Once);
 
-    if (ImGui::Begin("RAMBO | Control Center", nullptr,
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings)) {
-        ImGui::TextUnformatted("RAMBO");
-        ImGui::SameLine();
-        ImGui::TextDisabled("CONTROL CENTER");
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 95.0f);
-        ImGui::TextDisabled("64-BIT");
-        ImGui::Separator();
-
-        if (!isLogin) {
-            ImGui::Spacing();
-            ImGui::TextUnformatted("Authentication");
-            ImGui::TextWrapped("Enter your access key to open the control menu.");
-            ImGui::Spacing();
-            ImGui::PushItemWidth(-1.0f);
-            ImGui::InputText("##rambo_access_key", s, sizeof(s));
-            ImGui::PopItemWidth();
-
-            if (ImGui::Button("Paste key", ImVec2(140.0f, 0.0f))) {
-                const std::string clipboardKey = getClipboardText();
-                std::strncpy(s, clipboardKey.c_str(), sizeof(s) - 1);
-                s[sizeof(s) - 1] = '\0';
-            }
+        if (ImGui::Begin("RAMBO Mod Menu", nullptr,
+                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings)) {
+            ImGui::TextUnformatted("RAMBO");
             ImGui::SameLine();
-            if (ImGui::Button("Login", ImVec2(140.0f, 0.0f))) {
-                authError = Login(s);
-                if (authError == "OK") {
-                    isLogin = bValid && g_Auth == g_Token;
-                    if (!isLogin) authError = "The key could not be verified.";
-                }
-            }
-            if (!authError.empty() && authError != "OK") {
-                ImGui::Spacing();
-                ImGui::TextWrapped("%s", authError.c_str());
-            }
-        } else if (ImGui::BeginTabBar("##RAMBO_MainTabs", ImGuiTabBarFlags_None)) {
-            if (ImGui::BeginTabItem("Dashboard")) {
-                ImGui::Spacing();
-                ImGui::TextUnformatted("Session overview");
-                ImGui::Separator();
-                ImGui::Columns(2, "##rambo_status_columns", false);
-                ImGui::TextDisabled("Visuals");
-                ImGui::TextUnformatted(Config.ESPMenu.Active ? "Enabled" : "Disabled");
-                ImGui::NextColumn();
-                ImGui::TextDisabled("Aim module");
-                ImGui::TextUnformatted(Config.AimBot.Enable ? "Enabled" : "Disabled");
-                ImGui::Columns(1);
-                ImGui::Spacing();
-                ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
-                ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
-                ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
-                ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
-                ImGui::Spacing();
-                ImGui::TextDisabled("Changes apply to the current game session.");
-                ImGui::EndTabItem();
-            }
+            ImGui::TextDisabled("Mod Menu");
+            ImGui::Separator();
 
-            if (ImGui::BeginTabItem("Combat")) {
-                ImGui::Spacing();
-                ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
-                ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
-                ImGui::Checkbox("Ignore bots", &Config.AimBot.IgnoreBot);
-                ImGui::Checkbox("Ignore knocked players", &Config.AimBot.IgnoreKnocked);
-                ImGui::Checkbox("Visibility check", &Config.AimMenu.VisCheck);
-                ImGui::Separator();
-                static const char* aimTypes[] = { "Distance", "Crosshair" };
-                static const char* aimTargets[] = { "Head", "Chest" };
-                static const char* aimTriggers[] = { "None", "Shooting", "Scoping", "Both", "Any" };
-                ImGui::SetNextItemWidth(-1.0f);
-                ImGui::Combo("Target selection", (int*)&Config.AimMenu.Type, aimTypes, IM_ARRAYSIZE(aimTypes));
-                ImGui::SetNextItemWidth(-1.0f);
-                ImGui::Combo("Target area", (int*)&Config.AimMenu.Target, aimTargets, IM_ARRAYSIZE(aimTargets));
-                ImGui::SetNextItemWidth(-1.0f);
-                ImGui::Combo("Activation", (int*)&Config.AimMenu.Trigger, aimTriggers, IM_ARRAYSIZE(aimTriggers));
-                if (Config.AimMenu.Type == EAimType::Croshhair) {
+            if (ImGui::BeginTabBar("##RAMBO_MainTabs", ImGuiTabBarFlags_None)) {
+                if (ImGui::BeginTabItem("Dashboard")) {
+                    ImGui::Spacing();
+                    ImGui::TextUnformatted("Current session");
+                    ImGui::Separator();
+                    ImGui::Columns(2, "##rambo_status_columns", false);
+                    ImGui::TextDisabled("Visual overlay");
+                    ImGui::TextUnformatted(Config.ESPMenu.Active ? "Enabled" : "Disabled");
+                    ImGui::NextColumn();
+                    ImGui::TextDisabled("Aim module");
+                    ImGui::TextUnformatted(Config.AimBot.Enable ? "Enabled" : "Disabled");
+                    ImGui::Columns(1);
+                    ImGui::Spacing();
+                    ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
+                    ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
+                    ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
+                    ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Combat")) {
+                    ImGui::Spacing();
+                    ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
+                    ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
+                    ImGui::Checkbox("Ignore bots", &Config.AimBot.IgnoreBot);
+                    ImGui::Checkbox("Ignore knocked players", &Config.AimBot.IgnoreKnocked);
+                    ImGui::Checkbox("Visibility check", &Config.AimMenu.VisCheck);
+                    ImGui::Separator();
+                    static const char* aimTypes[] = { "Distance", "Crosshair" };
+                    static const char* aimTargets[] = { "Head", "Chest" };
+                    static const char* aimTriggers[] = { "None", "Shooting", "Scoping", "Both", "Any" };
                     ImGui::SetNextItemWidth(-1.0f);
-                    ImGui::SliderFloat("Field of view", &Config.AimMenu.FOVSize, 0.0f, 500.0f, "%.0f");
-                }
-                ImGui::Checkbox("Fast fire control", &FASTSHOOT);
-                if (FASTSHOOT) {
+                    ImGui::Combo("Target selection", (int*)&Config.AimMenu.Type, aimTypes, IM_ARRAYSIZE(aimTypes));
                     ImGui::SetNextItemWidth(-1.0f);
-                    ImGui::SliderFloat("Fire control", &ControlSpeed, 0.0f, 0.70f, "%.2f");
+                    ImGui::Combo("Target area", (int*)&Config.AimMenu.Target, aimTargets, IM_ARRAYSIZE(aimTargets));
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::Combo("Activation", (int*)&Config.AimMenu.Trigger, aimTriggers, IM_ARRAYSIZE(aimTriggers));
+                    if (Config.AimMenu.Type == EAimType::Croshhair) {
+                        ImGui::SetNextItemWidth(-1.0f);
+                        ImGui::SliderFloat("Field of view", &Config.AimMenu.FOVSize, 0.0f, 500.0f, "%.0f");
+                    }
+                    ImGui::Checkbox("Fast fire control", &FASTSHOOT);
+                    if (FASTSHOOT) {
+                        ImGui::SetNextItemWidth(-1.0f);
+                        ImGui::SliderFloat("Fire control", &ControlSpeed, 0.0f, 0.70f, "%.2f");
+                    }
+                    ImGui::EndTabItem();
                 }
-                ImGui::EndTabItem();
-            }
 
-            if (ImGui::BeginTabItem("Visuals")) {
-                ImGui::Spacing();
-                ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
-                ImGui::Separator();
-                ImGui::Columns(2, "##rambo_visual_columns", false);
-                ImGui::Checkbox("Lines", &Config.ESPMenu.Line);
-                ImGui::Checkbox("Boxes", &Config.ESPMenu.Box);
-                ImGui::Checkbox("Skeleton", &Config.ESPMenu.Skeleton);
-                ImGui::Checkbox("Names", &Config.ESPMenu.Name);
-                ImGui::Checkbox("Health", &Config.ESPMenu.Health);
-                ImGui::Checkbox("Distance", &Config.ESPMenu.Distance);
-                ImGui::NextColumn();
-                ImGui::Checkbox("Enemy weapon", &Config.ESPMenu.EnemyWeapon);
-                ImGui::Checkbox("Vehicles", &Config.ESPMenu.Vehicle);
-                ImGui::Checkbox("Loot boxes", &Config.ESPMenu.LootBox);
-                ImGui::Checkbox("Alerts", &Config.ESPMenu.Alert);
-                ImGui::Checkbox("Game information", &Config.ESPMenu.GameInfo);
-                ImGui::Columns(1);
-                ImGui::EndTabItem();
-            }
+                if (ImGui::BeginTabItem("Visuals")) {
+                    ImGui::Spacing();
+                    ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
+                    ImGui::Separator();
+                    ImGui::Columns(2, "##rambo_visual_columns", false);
+                    ImGui::Checkbox("Lines", &Config.ESPMenu.Line);
+                    ImGui::Checkbox("Boxes", &Config.ESPMenu.Box);
+                    ImGui::Checkbox("Skeleton", &Config.ESPMenu.Skeleton);
+                    ImGui::Checkbox("Names", &Config.ESPMenu.Name);
+                    ImGui::Checkbox("Health", &Config.ESPMenu.Health);
+                    ImGui::Checkbox("Distance", &Config.ESPMenu.Distance);
+                    ImGui::NextColumn();
+                    ImGui::Checkbox("Enemy weapon", &Config.ESPMenu.EnemyWeapon);
+                    ImGui::Checkbox("Vehicles", &Config.ESPMenu.Vehicle);
+                    ImGui::Checkbox("Loot boxes", &Config.ESPMenu.LootBox);
+                    ImGui::Checkbox("Alerts", &Config.ESPMenu.Alert);
+                    ImGui::Checkbox("Game information", &Config.ESPMenu.GameInfo);
+                    ImGui::Columns(1);
+                    ImGui::EndTabItem();
+                }
 
-            if (ImGui::BeginTabItem("Misc")) {
-                ImGui::Spacing();
-                ImGui::Columns(2, "##rambo_misc_columns", false);
-                ImGui::Checkbox("Flash setting", &Config.HighRisk.Flash);
-                ImGui::Checkbox("Parachute", &Config.HighRisk.Parachute);
-                ImGui::Checkbox("Unlimited ammo logic", &Config.HighRisk.UnlimitedAmmo1);
-                ImGui::Checkbox("Sky movement", &Config.HighRisk.SkyFly);
-                ImGui::Checkbox("Wide view", &Config.HighRisk.WideView);
-                ImGui::NextColumn();
-                ImGui::Checkbox("No fog", &Config.HighRisk.NoFog);
-                ImGui::Checkbox("Recoil setting", &Config.HighRisk.Recoil);
-                ImGui::Checkbox("Camera shake", &Config.HighRisk.Shake);
-                ImGui::Checkbox("Hit effect", &Config.HighRisk.HitEffect);
-                ImGui::Checkbox("Kill message", &Config.HighRisk.KillMsg);
-                ImGui::Columns(1);
-                ImGui::Separator();
-                ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
-                ImGui::EndTabItem();
-            }
+                if (ImGui::BeginTabItem("Misc")) {
+                    ImGui::Spacing();
+                    ImGui::Columns(2, "##rambo_misc_columns", false);
+                    ImGui::Checkbox("Flash setting", &Config.HighRisk.Flash);
+                    ImGui::Checkbox("Parachute", &Config.HighRisk.Parachute);
+                    ImGui::Checkbox("Unlimited ammo logic", &Config.HighRisk.UnlimitedAmmo1);
+                    ImGui::Checkbox("Sky movement", &Config.HighRisk.SkyFly);
+                    ImGui::Checkbox("Wide view", &Config.HighRisk.WideView);
+                    ImGui::NextColumn();
+                    ImGui::Checkbox("No fog", &Config.HighRisk.NoFog);
+                    ImGui::Checkbox("Recoil setting", &Config.HighRisk.Recoil);
+                    ImGui::Checkbox("Camera shake", &Config.HighRisk.Shake);
+                    ImGui::Checkbox("Hit effect", &Config.HighRisk.HitEffect);
+                    ImGui::Checkbox("Kill message", &Config.HighRisk.KillMsg);
+                    ImGui::Columns(1);
+                    ImGui::Separator();
+                    ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
+                    ImGui::EndTabItem();
+                }
 
-            if (ImGui::BeginTabItem("Settings")) {
-                ImGui::Spacing();
-                ImGui::TextUnformatted("Interface");
-                ImGui::TextWrapped("The menu uses Dear ImGui's default dark palette. The controls below do not recolor the interface.");
-                ImGui::Separator();
-                ImGui::TextDisabled("Renderer: OpenGL ES 3");
-                ImGui::TextDisabled("Layout: tabbed control center");
-                ImGui::TextDisabled("Target: Android 64-bit");
-                ImGui::EndTabItem();
-            }
+                if (ImGui::BeginTabItem("Settings")) {
+                    ImGui::Spacing();
+                    ImGui::TextUnformatted("Interface information");
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Theme: Dear ImGui default dark");
+                    ImGui::TextDisabled("Renderer: OpenGL ES 3");
+                    ImGui::TextDisabled("Architecture: arm64-v8a");
+                    ImGui::TextDisabled("Menu: native RAMBO.cpp");
+                    ImGui::EndTabItem();
+                }
 
-            if (ImGui::BeginTabItem("About")) {
-                ImGui::Spacing();
-                ImGui::TextUnformatted("RAMBO Control Center");
-                ImGui::TextDisabled("Native ImGui menu");
-                ImGui::Separator();
-                ImGui::TextWrapped("The menu layout is organized into Dashboard, Combat, Visuals, Misc, Settings, and About tabs.");
-                ImGui::TextWrapped("Palette: Dear ImGui stock dark theme.");
-                ImGui::EndTabItem();
+                if (ImGui::BeginTabItem("About")) {
+                    ImGui::Spacing();
+                    ImGui::TextUnformatted("RAMBO Mod Menu");
+                    ImGui::Separator();
+                    ImGui::TextWrapped("Native ImGui interface. The floating logo opens and closes this menu.");
+                    ImGui::TextWrapped("The interface uses the built-in Dear ImGui dark preset without custom palette overrides.");
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
-            ImGui::EndTabBar();
         }
+        ImGui::End();
     }
-    ImGui::End();
-    } // showModMenu
 
     // Keep the launcher above the menu window so it remains tappable while open.
     const float logoSize = std::max(48.0f, (float)density / 8.0f);
@@ -2421,11 +2075,26 @@ EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
                                    ImVec4(1.0f, 1.0f, 1.0f, 1.0f))) {
                 showModMenu = !showModMenu;
             }
-        } else if (ImGui::Button(showModMenu ? "Close" : "RAMBO")) {
-            showModMenu = !showModMenu;
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(showModMenu ? "Close RAMBO menu" : "Open RAMBO menu");
+        } else {
+            // Icon-only fallback using the stock ImGui palette; never show text.
+            ImGui::InvisibleButton("##RAMBO_FloatingLogoFallback", ImVec2(logoSize, logoSize));
+            if (ImGui::IsItemClicked()) {
+                showModMenu = !showModMenu;
+            }
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImVec2 itemMin = ImGui::GetItemRectMin();
+            const ImVec2 itemMax = ImGui::GetItemRectMax();
+            const ImVec2 center((itemMin.x + itemMax.x) * 0.5f, (itemMin.y + itemMax.y) * 0.5f);
+            const float radius = logoSize * 0.42f;
+            drawList->AddCircleFilled(center, radius, ImGui::GetColorU32(ImGuiCol_Button), 32);
+            drawList->AddCircle(center, radius, ImGui::GetColorU32(ImGuiCol_Border), 32, 1.5f);
+            drawList->AddCircle(center, radius * 0.40f, ImGui::GetColorU32(ImGuiCol_Text), 32, 1.5f);
+            drawList->AddLine(ImVec2(center.x - radius * 0.72f, center.y),
+                              ImVec2(center.x + radius * 0.72f, center.y),
+                              ImGui::GetColorU32(ImGuiCol_Text), 1.5f);
+            drawList->AddLine(ImVec2(center.x, center.y - radius * 0.72f),
+                              ImVec2(center.x, center.y + radius * 0.72f),
+                              ImGui::GetColorU32(ImGuiCol_Text), 1.5f);
         }
     }
     ImGui::End();
