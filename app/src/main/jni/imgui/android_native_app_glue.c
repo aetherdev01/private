@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <jni.h>
 
 #include <errno.h>
