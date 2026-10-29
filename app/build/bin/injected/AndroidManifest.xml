@@ -9,27 +9,15 @@
 		android:minSdkVersion="21"
 		android:targetSdkVersion="29"/>
 
-	<uses-permission
-		android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-
-	<uses-permission
-		android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-
-	<uses-permission
-		android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-
 	<application
 		android:allowBackup="true"
-		android:icon="@drawable/ic_launcher"
-		android:label="𝐑𝐀𝐌𝐁𝐎||𝐒𝐑𝐂✓"
-		android:roundIcon="@mipmap/ic_launcher_round"
-		android:supportsRtl="true"
-		android:requestLegacyExternalStorage="true">
+		android:label="RAMBO ImGui Preview"
+		android:supportsRtl="true">
 
 		<activity
 			android:name=".MainActivity"
-			android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-			android:screenOrientation="sensorLandscape"
+			android:theme="@android:style/Theme.Material.NoActionBar"
+			android:screenOrientation="portrait"
 			android:exported="true">
 
 			<intent-filter>

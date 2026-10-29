@@ -1,82 +1,49 @@
-name: Build All JNI Native Libraries
+name: Build RAMBO ImGui APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'app/src/main/jni/**'
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
       - '.github/workflows/build.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build JNI - arm64-v8a
+  build-apk:
     runs-on: ubuntu-22.04
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.6.4'
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: platform-tools
-
-      - name: Install Android NDK
-        shell: bash
+      - name: Install Android SDK and NDK
+        run: sdkmanager --install 'platforms;android-33' 'build-tools;33.0.2' 'ndk;25.2.9519653'
+      - name: Build lightweight release APK
+        run: gradle --no-daemon clean :app:assembleRelease
+      - name: Verify APK
         run: |
           set -euo pipefail
-          sdkmanager --install "ndk;27.2.12479018"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
-
-      - name: Build all JNI modules
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          JNI_DIR="$GITHUB_WORKSPACE/app/src/main/jni"
-          test -d "$JNI_DIR"
-
-          echo "=== JNI build files ==="
-          find "$JNI_DIR" -type f \( -name Android.mk -o -name Application.mk \) -print
-
-          if [ ! -f "$JNI_DIR/Android.mk" ]; then
-            echo "::error::Tidak ditemukan Android.mk utama di app/src/main/jni/"
-            echo "Periksa lokasi Android.mk dan konfigurasi build."
-            exit 1
-          fi
-
-          mkdir -p "$RUNNER_TEMP/ndk-obj" "$RUNNER_TEMP/ndk-libs"
-
-          "$ANDROID_NDK_HOME/ndk-build" \
-            NDK_PROJECT_PATH="$JNI_DIR" \
-            APP_BUILD_SCRIPT="$JNI_DIR/Android.mk" \
-            NDK_APPLICATION_MK="$JNI_DIR/Application.mk" \
-            NDK_OUT="$RUNNER_TEMP/ndk-obj" \
-            NDK_LIBS_OUT="$RUNNER_TEMP/ndk-libs" \
-            APP_ABI=arm64-v8a \
-            -j2
-
-          echo "=== Generated shared libraries ==="
-          find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print
-
-          if ! find "$RUNNER_TEMP/ndk-libs" -type f -name '*.so' -print -quit | grep -q .; then
-            echo "::error::Build selesai tanpa menghasilkan file .so"
-            exit 1
-          fi
-
-      - name: Upload only SO files
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          ls -lh "$APK"
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: jni-libraries-arm64-v8a
-          path: ${{ runner.temp }}/ndk-libs/**/*.so
+          name: RAMBO-ImGui-Preview-arm64-release
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14

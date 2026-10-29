@@ -23,6 +23,7 @@ using namespace SDK;
 
 #include "Iconcpp.h"
 #include "CN.h"
+#include "FloatingLogoTexture.h"
 
 
 static char s[64] = { "" };
@@ -79,16 +80,12 @@ float density = -1;
 json items_data;
 time_t rng = 0;
 std::string g_Token, g_Auth;
-static float iPadSliderValue = 1.0f; // 1.0 = default, 1.3 = wider view
-bool Logo = false;
 bool bValid = false;
 bool initImGui = false;
 bool FASTSHOOT = true;
 float ControlSpeed = 0.25f;
 
-bool PeekUp = true;
 
-bool AutoFireOff;
 enum EAimType {
     Distance = 0,
     Croshhair = 1
@@ -888,58 +885,6 @@ if (UnlimitedAmmo && g_LocalPlayer && g_LocalPlayer->WeaponManagerComponent && g
     }
 }
 }
-void Draw3DNeedleLine(float width = 220.0f, float maxHeight = 6.0f) {
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImVec2 p = ImGui::GetCursorScreenPos();
-
-    // Colors
-    ImU32 col_start = IM_COL32(255, 0, 0, 255);   // faint red at edges
-    ImU32 col_mid   = IM_COL32(255, 0, 0, 255);  // bright red in center
-    ImU32 col_black = IM_COL32(0, 0, 0, 255);      // thin black separator
-
-    int segments = 40; // smoothness
-    float half = width * 0.5f;
-
-    for (int i = 0; i < segments; i++) {
-        float t1 = (float)i / segments;     // 0 → 1
-        float t2 = (float)(i+1) / segments;
-
-        // thickness function → thin at edges, thick at center
-        float h1 = (1.0f - fabsf(t1 - 0.5f) * 2.0f) * maxHeight;
-        float h2 = (1.0f - fabsf(t2 - 0.5f) * 2.0f) * maxHeight;
-
-        // color gradient → fade at edges, strong center
-        ImU32 c1 = ImGui::GetColorU32(ImVec4(
-            1.0f, 0.2f + 0.6f*(1 - fabsf(t1-0.5f)*2), 0.2f, 
-            0.3f + 0.7f*(1 - fabsf(t1-0.5f)*2)
-        ));
-        ImU32 c2 = ImGui::GetColorU32(ImVec4(
-            1.0f, 0.2f + 0.6f*(1 - fabsf(t2-0.5f)*2), 0.2f, 
-            0.3f + 0.7f*(1 - fabsf(t2-0.5f)*2)
-        ));
-
-        float x1 = p.x + t1 * width;
-        float x2 = p.x + t2 * width;
-        float y  = p.y;
-
-        // trapezoid segment
-        dl->AddQuadFilled(
-            ImVec2(x1, y - h1*0.5f),
-            ImVec2(x2, y - h2*0.5f),
-            ImVec2(x2, y + h2*0.5f),
-            ImVec2(x1, y + h1*0.5f),
-            c1
-        );
-    }
-
-    // small black edge for 3D sharpness
-    dl->AddLine(ImVec2(p.x, p.y), ImVec2(p.x + width, p.y), col_black, 1.0f);
-
-    ImGui::Dummy(ImVec2(width, maxHeight + 2));
-}
-
-
-
 //===================== ESP DRAW =====================//
 void DrawESP(ImDrawList *draw) {
     
@@ -2227,102 +2172,26 @@ EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 
     if (!initImGui) {
         ImGui::CreateContext();
-ImGuiStyle& style = ImGui::GetStyle();
-ImGui::StyleColorsDark();
-ImFontConfig CustomFont;
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+        // Keep Dear ImGui's stock dark palette; only adjust layout metrics.
+        style.WindowPadding = ImVec2(12.0f, 10.0f);
+        style.FramePadding = ImVec2(8.0f, 6.0f);
+        style.ItemSpacing = ImVec2(8.0f, 7.0f);
+        style.WindowRounding = 6.0f;
+        style.ChildRounding = 4.0f;
+        style.FrameRounding = 4.0f;
+        style.PopupRounding = 4.0f;
+        style.ScrollbarRounding = 5.0f;
+        style.GrabRounding = 4.0f;
+        style.TabRounding = 4.0f;
+        style.WindowBorderSize = 1.0f;
+        style.FrameBorderSize = 0.0f;
+        style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
+        style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
+        ImFontConfig CustomFont;
 
-
-        style.FramePadding = ImVec2(3, 3);
-        style.FrameRounding = 0.6f;//boton gol size
-        style.WindowRounding = 0.4f;//
-        style.WindowTitleAlign = ImVec2(0.5, 0.5);
-		style.FrameBorderSize = 2.0f;
-	
-		
-        style.WindowTitleAlign = ImVec2(0.5,0.5);
-        style.ButtonTextAlign = ImVec2(0.5,0.5);
-		
- 
-// --- Backgrounds ---
-style.Colors[ImGuiCol_WindowBg]        = ImColor(255, 255, 255, 255);  // White panel background
-style.Colors[ImGuiCol_ChildBg]         = ImColor(255, 255, 255, 245);
-style.Colors[ImGuiCol_PopupBg]         = ImColor(255, 255, 255, 240);
-
-// --- Text ---
-style.Colors[ImGuiCol_Text]            = ImColor(0, 0, 0, 255);        // Black text
-style.Colors[ImGuiCol_TextDisabled]    = ImColor(120, 120, 120, 255);
-
-// --- Borders ---
-style.Colors[ImGuiCol_Border]          = ImColor(0, 0, 0, 180);
-style.Colors[ImGuiCol_BorderShadow]    = ImColor(255, 255, 255, 0);
-
-// --- Buttons ---
-style.Colors[ImGuiCol_Button]          = ImColor(245, 219, 15, 255);   // Main Yellow
-style.Colors[ImGuiCol_ButtonHovered]   = ImColor(243, 204, 13, 255);   // Light Yellow hover
-style.Colors[ImGuiCol_ButtonActive]    = ImColor(220, 190, 10, 255);   // Dark Yellow active
-
-// --- Danger Button (Red) ---
-style.Colors[ImGuiCol_Header]          = ImColor(216, 46, 46, 255);    // Red header
-style.Colors[ImGuiCol_HeaderHovered]   = ImColor(230, 60, 60, 255);
-style.Colors[ImGuiCol_HeaderActive]    = ImColor(190, 35, 35, 255);
-
-// --- Tabs ---
-style.Colors[ImGuiCol_Tab]             = ImColor(245, 219, 15, 220);   // Yellow
-style.Colors[ImGuiCol_TabHovered]      = ImColor(243, 204, 13, 255);
-style.Colors[ImGuiCol_TabActive]       = ImColor(220, 190, 10, 255);
-style.Colors[ImGuiCol_TabUnfocused]    = ImColor(245, 219, 15, 160);
-style.Colors[ImGuiCol_TabUnfocusedActive] = ImColor(220, 190, 10, 200);
-
-// --- Sliders (Bar & Grab Colors) ---
-style.Colors[ImGuiCol_FrameBg]         = ImColor(245, 219, 15, 255);   // Yellow track
-style.Colors[ImGuiCol_FrameBgHovered]  = ImColor(243, 204, 13, 255);
-style.Colors[ImGuiCol_FrameBgActive]   = ImColor(220, 190, 10, 255);
-style.Colors[ImGuiCol_SliderGrab]      = ImColor(220, 28, 176, 255);   // Magenta grab
-style.Colors[ImGuiCol_SliderGrabActive]= ImColor(220, 28, 176, 255);
-
-// --- Scrollbar ---
-style.Colors[ImGuiCol_ScrollbarBg]         = ImColor(255, 255, 255, 240);
-style.Colors[ImGuiCol_ScrollbarGrab]       = ImColor(245, 219, 15, 200);
-style.Colors[ImGuiCol_ScrollbarGrabHovered]= ImColor(243, 204, 13, 255);
-style.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(220, 190, 10, 255);
-
-style.Colors[ImGuiCol_TitleBg]         = ImColor(255, 255, 255, 255);       // Dark steel
-style.Colors[ImGuiCol_TitleBgActive]   = ImColor(255, 255, 255, 255);          // Deep black
-style.Colors[ImGuiCol_TitleBgCollapsed] = ImColor(255, 255, 255, 255);       // Muted grey
-
-// --- Checkmark (flash square color) ---
-style.Colors[ImGuiCol_CheckMark]       = ImColor(255, 0, 0, 255);   // Yellow
-
-// --- Separator Lines ---
-style.Colors[ImGuiCol_Separator]       = ImColor(0, 0, 0, 120);
-style.Colors[ImGuiCol_SeparatorHovered]= ImColor(245, 219, 15, 255);
-style.Colors[ImGuiCol_SeparatorActive] = ImColor(220, 190, 10, 255);
-
-// --- Plots ---
-style.Colors[ImGuiCol_PlotLines]       = ImColor(0, 0, 0, 255);
-style.Colors[ImGuiCol_PlotLinesHovered]= ImColor(245, 219, 15, 255);
-style.Colors[ImGuiCol_PlotHistogram]   = ImColor(220, 28, 176, 255);
-style.Colors[ImGuiCol_PlotHistogramHovered] = ImColor(245, 219, 15, 255);
-
-// --- Tables ---
-style.Colors[ImGuiCol_TableHeaderBg]       = ImColor(255, 255, 255, 255);
-style.Colors[ImGuiCol_TableBorderStrong]   = ImColor(0, 0, 0, 100);
-style.Colors[ImGuiCol_TableBorderLight]    = ImColor(0, 0, 0, 40);
-style.Colors[ImGuiCol_TableRowBg]          = ImColor(255, 255, 255, 255);
-style.Colors[ImGuiCol_TableRowBgAlt]       = ImColor(245, 219, 15, 40);
-
-// --- Navigation / Highlights ---
-style.Colors[ImGuiCol_TextSelectedBg]      = ImColor(245, 219, 15, 90);
-style.Colors[ImGuiCol_DragDropTarget]      = ImColor(220, 28, 176, 200);
-style.Colors[ImGuiCol_NavHighlight]        = ImColor(245, 219, 15, 200);
-style.Colors[ImGuiCol_NavWindowingHighlight] = ImColor(245, 219, 15, 180);
-style.Colors[ImGuiCol_NavWindowingDimBg]   = ImColor(255, 255, 255, 120);
-style.Colors[ImGuiCol_ModalWindowDimBg]    = ImColor(255, 255, 255, 100);
-
-// --- Optional Rounding ---
-
-
-        style.ScaleAllSizes(std::max(2.5f, density / 280.0f));
+        style.ScaleAllSizes(std::max(1.0f, density / 420.0f));
         style.ScrollbarSize /= 1;
 
 
@@ -2363,267 +2232,205 @@ style.Colors[ImGuiCol_ModalWindowDimBg]    = ImColor(255, 255, 255, 100);
     ImGui::NewFrame();
     
     DrawESP(ImGui::GetBackgroundDrawList());
-	
-		if (PeekUp) {
-ImGui::SetNextWindowPos(ImVec2(390,220), ImGuiCond_FirstUseEver);
-ImGui::SetNextWindowSize(ImVec2(390,220), ImGuiCond_FirstUseEver); 
-static int clicked = 0;
-if (ImGui::Begin("###3131", 0,
-ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
-ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground))
 
-ImGui::Checkbox("AF", &Config.AimMenu.AutoFire);
-ImGui::SameLine();
-ImGui::Checkbox("LUND", &Config.HighRisk.Parachute);
+    // The floating logo toggles this menu; it is drawn last so it stays above the panel.
+    static bool showModMenu = false;
+    static bool isLogin = false;
+    static std::string authError;
+    if (showModMenu) {
+    const float menuWidth = std::min(760.0f, std::max(360.0f, (float)glWidth * 0.62f));
+    const float menuHeight = std::min(650.0f, std::max(330.0f, (float)glHeight * 0.80f));
+    ImGui::SetNextWindowPos(ImVec2((float)glWidth * 0.5f, (float)glHeight * 0.5f),
+                            ImGuiCond_Once, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_Once);
 
-ImGui::SameLine();
-ImGui::Checkbox("FLASH ", &Config.HighRisk.Flash);
+    if (ImGui::Begin("RAMBO | Control Center", nullptr,
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::TextUnformatted("RAMBO");
+        ImGui::SameLine();
+        ImGui::TextDisabled("CONTROL CENTER");
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 95.0f);
+        ImGui::TextDisabled("64-BIT");
+        ImGui::Separator();
 
-ImGui::Checkbox("IB ", &Config.AimBot.IgnoreBot);
-ImGui::SameLine();
+        if (!isLogin) {
+            ImGui::Spacing();
+            ImGui::TextUnformatted("Authentication");
+            ImGui::TextWrapped("Enter your access key to open the control menu.");
+            ImGui::Spacing();
+            ImGui::PushItemWidth(-1.0f);
+            ImGui::InputText("##rambo_access_key", s, sizeof(s));
+            ImGui::PopItemWidth();
 
-ImGui::TableNextColumn();
-ImGui::Checkbox("IN B   ", &Config.AimBot.IgnoreKnocked);
+            if (ImGui::Button("Paste key", ImVec2(140.0f, 0.0f))) {
+                const std::string clipboardKey = getClipboardText();
+                std::strncpy(s, clipboardKey.c_str(), sizeof(s) - 1);
+                s[sizeof(s) - 1] = '\0';
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Login", ImVec2(140.0f, 0.0f))) {
+                authError = Login(s);
+                if (authError == "OK") {
+                    isLogin = bValid && g_Auth == g_Token;
+                    if (!isLogin) authError = "The key could not be verified.";
+                }
+            }
+            if (!authError.empty() && authError != "OK") {
+                ImGui::Spacing();
+                ImGui::TextWrapped("%s", authError.c_str());
+            }
+        } else if (ImGui::BeginTabBar("##RAMBO_MainTabs", ImGuiTabBarFlags_None)) {
+            if (ImGui::BeginTabItem("Dashboard")) {
+                ImGui::Spacing();
+                ImGui::TextUnformatted("Session overview");
+                ImGui::Separator();
+                ImGui::Columns(2, "##rambo_status_columns", false);
+                ImGui::TextDisabled("Visuals");
+                ImGui::TextUnformatted(Config.ESPMenu.Active ? "Enabled" : "Disabled");
+                ImGui::NextColumn();
+                ImGui::TextDisabled("Aim module");
+                ImGui::TextUnformatted(Config.AimBot.Enable ? "Enabled" : "Disabled");
+                ImGui::Columns(1);
+                ImGui::Spacing();
+                ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
+                ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
+                ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
+                ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
+                ImGui::Spacing();
+                ImGui::TextDisabled("Changes apply to the current game session.");
+                ImGui::EndTabItem();
+            }
 
-ImGui::SameLine();
-ImGui::Checkbox("MAG ", &UnlimitedAmmo);
-	}
-	
-	
-	
-    ImGui::SetNextWindowSize(ImVec2((float) glWidth * 0.22f, (float) glHeight * 0.72f), ImGuiCond_Once);
-  if (ImGui::Begin(OBFUSCATE("RAMBO||FLASH||64-BIT"), 0, ImGuiWindowFlags_NoSavedSettings)){
+            if (ImGui::BeginTabItem("Combat")) {
+                ImGui::Spacing();
+                ImGui::Checkbox("Enable aim module", &Config.AimBot.Enable);
+                ImGui::Checkbox("Automatic fire", &Config.AimMenu.AutoFire);
+                ImGui::Checkbox("Ignore bots", &Config.AimBot.IgnoreBot);
+                ImGui::Checkbox("Ignore knocked players", &Config.AimBot.IgnoreKnocked);
+                ImGui::Checkbox("Visibility check", &Config.AimMenu.VisCheck);
+                ImGui::Separator();
+                static const char* aimTypes[] = { "Distance", "Crosshair" };
+                static const char* aimTargets[] = { "Head", "Chest" };
+                static const char* aimTriggers[] = { "None", "Shooting", "Scoping", "Both", "Any" };
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("Target selection", (int*)&Config.AimMenu.Type, aimTypes, IM_ARRAYSIZE(aimTypes));
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("Target area", (int*)&Config.AimMenu.Target, aimTargets, IM_ARRAYSIZE(aimTargets));
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::Combo("Activation", (int*)&Config.AimMenu.Trigger, aimTriggers, IM_ARRAYSIZE(aimTriggers));
+                if (Config.AimMenu.Type == EAimType::Croshhair) {
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::SliderFloat("Field of view", &Config.AimMenu.FOVSize, 0.0f, 500.0f, "%.0f");
+                }
+                ImGui::Checkbox("Fast fire control", &FASTSHOOT);
+                if (FASTSHOOT) {
+                    ImGui::SetNextItemWidth(-1.0f);
+                    ImGui::SliderFloat("Fire control", &ControlSpeed, 0.0f, 0.70f, "%.2f");
+                }
+                ImGui::EndTabItem();
+            }
 
-        static bool isLogin = false;
-if (!isLogin) {
-	ImGui::Text(OBFUSCATE(ICON_FA_BOMB" BHOSDI KE FEADBACK"));
-	ImGui::Text(OBFUSCATE(ICON_FA_BOMB" NHI DOGE TO YAHI HOGA "));
-	
- ImGui::TextColored(ImVec4(0, 0.88f, 0.73f, 1.00f), "");
- ImGui::Begin("MA CHUD JAYEGI CRECK KRNE ME ",  &isLogin);
-static std::string err;
-ImGui::Text(OBFUSCATE("Please Login! (Paste the Key to the Board)"));
-ImGui::PushItemWidth(-1);
-ImGui::InputText(OBFUSCATE("##key"), s, sizeof s);
-auto key = getClipboardText();
-static std::string key1;
-std::ifstream dosya2("/data/data/com.tencent.iglite/RAMBO_OPLite.txt");
-if (dosya2.is_open()) {
-std::getline(dosya2, key1);
-dosya2.close();
-}
-if(key1 != key.c_str()){
-strncpy(s, key.c_str(), sizeof s);
-err = Login(s);
-if (err == "OK") {
-std::ofstream dosya("/data/data/com.tencent.iglite/RAMBO_OPLite.txt");
-if (dosya.is_open()) {dosya << s << std::endl;dosya.close(); }
-isLogin = bValid && g_Auth == g_Token;
-}else{
-strncpy(s, key1.c_str(), sizeof s);
-err = Login(s);
-if (err == "OK") {
-isLogin = bValid && g_Auth == g_Token;
+            if (ImGui::BeginTabItem("Visuals")) {
+                ImGui::Spacing();
+                ImGui::Checkbox("Enable visual overlay", &Config.ESPMenu.Active);
+                ImGui::Separator();
+                ImGui::Columns(2, "##rambo_visual_columns", false);
+                ImGui::Checkbox("Lines", &Config.ESPMenu.Line);
+                ImGui::Checkbox("Boxes", &Config.ESPMenu.Box);
+                ImGui::Checkbox("Skeleton", &Config.ESPMenu.Skeleton);
+                ImGui::Checkbox("Names", &Config.ESPMenu.Name);
+                ImGui::Checkbox("Health", &Config.ESPMenu.Health);
+                ImGui::Checkbox("Distance", &Config.ESPMenu.Distance);
+                ImGui::NextColumn();
+                ImGui::Checkbox("Enemy weapon", &Config.ESPMenu.EnemyWeapon);
+                ImGui::Checkbox("Vehicles", &Config.ESPMenu.Vehicle);
+                ImGui::Checkbox("Loot boxes", &Config.ESPMenu.LootBox);
+                ImGui::Checkbox("Alerts", &Config.ESPMenu.Alert);
+                ImGui::Checkbox("Game information", &Config.ESPMenu.GameInfo);
+                ImGui::Columns(1);
+                ImGui::EndTabItem();
+            }
 
-}
-}
-}else{
-strncpy(s, key.c_str(), sizeof s);
-err = Login(s);
-if (err == "OK") {
-isLogin = bValid && g_Auth == g_Token;
-}
-}
-ImGui::PopItemWidth();
-ImGui::PushItemWidth(-1);
-if (ImGui::Button(OBFUSCATE("Paste Key"), ImVec2(ImGui::GetContentRegionAvailWidth(), 0))) {
-auto key = getClipboardText();
-strncpy(s, key.c_str(), sizeof s);
-}
-ImGui::PopItemWidth();
-ImGui::PushItemWidth(-1);
-if (ImGui::Button(OBFUSCATE("Login"), ImVec2(ImGui::GetContentRegionAvailWidth(), 0))) {
-err = Login(s);
-if (err == "OK") {
-std::ofstream dosya("/data/data/com.tencent.iglite/RAMBO_OPLite.txt");
-if (dosya.is_open()) {dosya << s << std::endl;dosya.close(); }
-isLogin = bValid && g_Auth == g_Token;
-}
-}
-ImGui::PopItemWidth();
-if (!err.empty() && err != "OK") {
-ImGui::Text(OBFUSCATE("Error: %s"), err.c_str());
-}
-ImGui::PopItemWidth();
-} else {
-		Draw3DNeedleLine(280.0f, 8.0f);
-		if (Config.ESPMenu.Active) {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(249, 234, 192, 255)); // Normal Button Color
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 244, 210, 255)); // Hover color
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(200, 185, 160, 255)); // Active color
+            if (ImGui::BeginTabItem("Misc")) {
+                ImGui::Spacing();
+                ImGui::Columns(2, "##rambo_misc_columns", false);
+                ImGui::Checkbox("Flash setting", &Config.HighRisk.Flash);
+                ImGui::Checkbox("Parachute", &Config.HighRisk.Parachute);
+                ImGui::Checkbox("Unlimited ammo logic", &Config.HighRisk.UnlimitedAmmo1);
+                ImGui::Checkbox("Sky movement", &Config.HighRisk.SkyFly);
+                ImGui::Checkbox("Wide view", &Config.HighRisk.WideView);
+                ImGui::NextColumn();
+                ImGui::Checkbox("No fog", &Config.HighRisk.NoFog);
+                ImGui::Checkbox("Recoil setting", &Config.HighRisk.Recoil);
+                ImGui::Checkbox("Camera shake", &Config.HighRisk.Shake);
+                ImGui::Checkbox("Hit effect", &Config.HighRisk.HitEffect);
+                ImGui::Checkbox("Kill message", &Config.HighRisk.KillMsg);
+                ImGui::Columns(1);
+                ImGui::Separator();
+                ImGui::Checkbox("Unlimited ammo", &UnlimitedAmmo);
+                ImGui::EndTabItem();
+            }
 
-    ImGui::PushID("AMMOOn");
-    if (ImGui::Button("ACTIVE ESP / ON", ImVec2(295, 40))) {
-        Config.ESPMenu.Active;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-    } else {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(255, 215, 0, 255));    // Yellow
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 215, 0, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(255, 215, 0, 255));
-    ImGui::PushID("AMMOOff");
-    if (ImGui::Button("ACTIVE ESP / OF", ImVec2(295, 40))) {
-		Config.ESPMenu.Active;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-}
+            if (ImGui::BeginTabItem("Settings")) {
+                ImGui::Spacing();
+                ImGui::TextUnformatted("Interface");
+                ImGui::TextWrapped("The menu uses Dear ImGui's default dark palette. The controls below do not recolor the interface.");
+                ImGui::Separator();
+                ImGui::TextDisabled("Renderer: OpenGL ES 3");
+                ImGui::TextDisabled("Layout: tabbed control center");
+                ImGui::TextDisabled("Target: Android 64-bit");
+                ImGui::EndTabItem();
+            }
 
-if (ImGui::IsItemClicked()) {
-Config.ESPMenu.Active = !Config.ESPMenu.Active;
-}
-	Draw3DNeedleLine(280.0f, 8.0f);
-if (Config.HighRisk.UnlimitedAmmo1) {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(249, 234, 192, 255)); // Normal Button Color
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 244, 210, 255)); // Hover color
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(200, 185, 160, 255)); // Active color
-
-    ImGui::PushID("AMMOOn");
-    if (ImGui::Button("UNLIMTED AUMO / ON", ImVec2(295, 40))) {
-        Config.HighRisk.UnlimitedAmmo1;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-    } else {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(255, 215, 0, 255));    // Yellow
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 215, 0, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(255, 215, 0, 255));
-    ImGui::PushID("AMMOOff");
-    if (ImGui::Button("UNLIMTED AUMO / OF", ImVec2(295, 40))) {
-		Config.HighRisk.UnlimitedAmmo1;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-}
-
-if (ImGui::IsItemClicked()) {
-Config.HighRisk.UnlimitedAmmo1 = !Config.HighRisk.UnlimitedAmmo1;
-}
-
-        Draw3DNeedleLine(280.0f, 8.0f);
-		ImGui::SetNextItemWidth(295); 
-	    static const char *type[] = {" TARGET DIS  ", " TARGET FOVE "};
-        ImGui::Combo("##Type", (int *) &Config.AimMenu.Type, type, 2, -1);
-        
-        if (Config.AimMenu.Type == EAimType::Croshhair) {
-        ImGui::SetNextItemWidth(295); 
-        ImGui::SliderFloat("##FOVSize", &Config.AimMenu.FOVSize, 0.0f, 500.0f);
+            if (ImGui::BeginTabItem("About")) {
+                ImGui::Spacing();
+                ImGui::TextUnformatted("RAMBO Control Center");
+                ImGui::TextDisabled("Native ImGui menu");
+                ImGui::Separator();
+                ImGui::TextWrapped("The menu layout is organized into Dashboard, Combat, Visuals, Misc, Settings, and About tabs.");
+                ImGui::TextWrapped("Palette: Dear ImGui stock dark theme.");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
         }
-        
-		Draw3DNeedleLine(280.0f, 8.0f);
-        ImGui::SetNextItemWidth(295); 
-if(FASTSHOOT){
-ImGui::SliderFloat("FIRE",&ControlSpeed,  (0.0f), (0.70f),"%.2f");
-}
-
-        Draw3DNeedleLine(280.0f, 8.0f);
-        ImGui::SetNextItemWidth(295); 
-        static const char *triggers[] = {"None", "Shooting", "Scoping", "Both (Shooting & Scoping)", "Any (Shooting / Scoping)"};
-        ImGui::Combo("##Trigger", (int *)&Config.AimMenu.Trigger, triggers, 5, -1);
-		Draw3DNeedleLine(280.0f, 8.0f);
-			
-		if (Config.AimBot.Enable) {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(249, 234, 192, 255)); // Normal Button Color
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 244, 210, 255)); // Hover color
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(200, 185, 160, 255)); // Active color
-    ImGui::PushID("AMMOOn");
-    if (ImGui::Button("AIMBOT / ON", ImVec2(295, 40))) {
-        Config.AimBot.Enable;
     }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-    } else {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(255, 215, 0, 255));    // Yellow
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 215, 0, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(255, 215, 0, 255));
-    ImGui::PushID("AMMOOff");
-    if (ImGui::Button("AIMBOT / OF", ImVec2(295, 40))) {
-		Config.AimBot.Enable;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-}
-
-if (ImGui::IsItemClicked()) {
-Config.AimBot.Enable = !Config.AimBot.Enable;
-	
-}
-Draw3DNeedleLine(280.0f, 8.0f);
-		
-if (Config.HighRisk.SkyFly) {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(249, 234, 192, 255)); // Normal Button Color
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 244, 210, 255)); // Hover color
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(200, 185, 160, 255)); // Active color
-    ImGui::PushID("AMMOOn");
-    if (ImGui::Button("SKY FLY/ ON", ImVec2(295, 40))) {
-        Config.HighRisk.SkyFly;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-    } else {
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(255, 215, 0, 255));    // Yellow
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 215, 0, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  IM_COL32(255, 215, 0, 255));
-    ImGui::PushID("AMMOOff");
-    if (ImGui::Button("SKY FLY/ OF", ImVec2(295, 40))) {
-		Config.HighRisk.SkyFly;
-    }
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-    drawList->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0, 122, 204, 255), 0.0f, 0, 2.0f);
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-}
-
-if (ImGui::IsItemClicked()) {
-Config.HighRisk.SkyFly = !Config.HighRisk.SkyFly;
-	
-}
-
-
-          }}
-                        
     ImGui::End();
+    } // showModMenu
+
+    // Keep the launcher above the menu window so it remains tappable while open.
+    const float logoSize = std::max(48.0f, (float)density / 8.0f);
+    const float logoMargin = std::max(8.0f, (float)density / 28.0f);
+    const float logoX = std::max(4.0f, (float)glWidth - logoSize - logoMargin);
+    const float logoY = std::max(4.0f, (float)glHeight * 0.40f);
+    ImGui::SetNextWindowPos(ImVec2(logoX, logoY), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    if (ImGui::Begin("##RAMBO_FloatingLogo", nullptr,
+                     ImGuiWindowFlags_NoDecoration |
+                     ImGuiWindowFlags_NoBackground |
+                     ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoFocusOnAppearing |
+                     ImGuiWindowFlags_NoNav |
+                     ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (RamboFloatingLogo::EnsureLoaded()) {
+            if (ImGui::ImageButton((ImTextureID)(intptr_t)RamboFloatingLogo::gTexture,
+                                   ImVec2(logoSize, logoSize),
+                                   ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+                                   0, ImVec4(0.0f, 0.0f, 0.0f, 0.0f),
+                                   ImVec4(1.0f, 1.0f, 1.0f, 1.0f))) {
+                showModMenu = !showModMenu;
+            }
+        } else if (ImGui::Button(showModMenu ? "Close" : "RAMBO")) {
+            showModMenu = !showModMenu;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(showModMenu ? "Close RAMBO menu" : "Open RAMBO menu");
+        }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+
     ImGui::Render();
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -2,8 +2,8 @@
 
 #include "imgui.h"
 
-// Standalone AetherX menu UI. These settings affect only this UI prototype;
-// they are intentionally not connected to game memory, aiming, or hooks.
+// Standalone preview state. These controls are for UI preview only and do not
+// connect to a game process or modify gameplay.
 struct AetherXMenuSettings {
     bool showFps = true;
     bool showFrameTime = true;
@@ -12,16 +12,10 @@ struct AetherXMenuSettings {
     float graphWindowSeconds = 10.0f;
 };
 
-// Call once after ImGui::CreateContext(). The palette remains Dear ImGui's
-// standard dark palette; only layout/rounding metrics are adjusted slightly.
 void AetherXMenuApplyDefaultStyle();
-
-// Call during each ImGui frame after ImGui::NewFrame().
-// configPath must point to a writable file in the host app's own storage.
 void AetherXMenuRender(bool* p_open,
                        AetherXMenuSettings& settings,
                        const char* configPath);
-
 bool AetherXMenuSaveConfig(const char* configPath,
                            const AetherXMenuSettings& settings);
 bool AetherXMenuLoadConfig(const char* configPath,
